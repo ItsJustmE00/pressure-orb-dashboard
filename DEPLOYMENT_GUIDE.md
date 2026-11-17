@@ -16,7 +16,7 @@
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              Cloudflare Tunnel (Backend)                     │
-│  https://compact-recovery-renaissance-veterans.trycloudflare.com │
+│  https://memo-appear-prospects-placement.trycloudflare.com │
 │  - Redirige vers localhost:8050                             │
 └──────────────────────────┬──────────────────────────────────┘
                            │
@@ -236,7 +236,7 @@ cloudflared tunnel --url http://127.0.0.1:8050 --no-autoupdate
 ## URLs importantes
 
 - **Frontend (Vercel)** : https://pressure-orb-dashboard.vercel.app
-- **Backend (Tunnel)** : https://compact-recovery-renaissance-veterans.trycloudflare.com
+- **Backend (Tunnel)** : https://memo-appear-prospects-placement.trycloudflare.com
 - **Backend (Local)** : http://127.0.0.1:8050
 - **GitHub** : https://github.com/VOTRE_USERNAME/pressure-orb-dashboard
 
