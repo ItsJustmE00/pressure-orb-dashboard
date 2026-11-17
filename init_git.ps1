@@ -46,10 +46,10 @@ if (-not $remote) {
     $remote = git remote get-url origin
 }
 Write-Host "[OK] Remote configured: $remote" -ForegroundColor Green
-git branch -M main
 if (-not (git rev-parse --verify HEAD 2>$null)) {
     git commit --allow-empty -m "Initial commit"
 }
+git branch -M main
 Write-Host "Pushing to GitHub..." -ForegroundColor Yellow
 git push -u origin main
 
