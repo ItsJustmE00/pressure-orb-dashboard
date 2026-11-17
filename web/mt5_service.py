@@ -200,10 +200,11 @@ def _read_config():
 
 def _market(symbol_tick):
     now_ny = datetime.now(NY)
+    now_morocco = datetime.now(timezone(timedelta(hours=1)))  # GMT+1 (Maroc)
     weekday = now_ny.weekday()
     clock = now_ny.time()
-    close_hour = 15
-    close_minute = 50 if weekday == 4 else 55
+    close_hour = 23  # Trade jusqu'à 23:00 NY
+    close_minute = 0
     close_time = now_ny.replace(
         hour=close_hour, minute=close_minute, second=0, microsecond=0
     ).time()
@@ -228,7 +229,7 @@ def _market(symbol_tick):
     elif clock < close_time:
         status = "open"
         phase = "entry_window"
-        label = "Fenêtre d'entrée"
+        label = "Fenêtre d'entrée (toute la journée)"
         next_event = f"{close_time.strftime('%H:%M')} NY"
     else:
         status = "closed"
@@ -247,6 +248,9 @@ def _market(symbol_tick):
         "ny_time": now_ny.isoformat(),
         "ny_clock": now_ny.strftime("%H:%M:%S"),
         "ny_date": now_ny.strftime("%d/%m/%Y"),
+        "morocco_time": now_morocco.isoformat(),
+        "morocco_clock": now_morocco.strftime("%H:%M:%S"),
+        "morocco_date": now_morocco.strftime("%d/%m/%Y"),
         "weekday": _WEEKDAYS[weekday],
         "status": status,
         "phase": phase,
