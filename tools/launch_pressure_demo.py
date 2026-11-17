@@ -19,7 +19,7 @@ DEFAULT_CONFIG = {
     "InpMagic": MAGIC,
     "InpRangeHourNY": 9,
     "InpRangeMinuteNY": 30,
-    "InpCloseHourNY": 16,
+    "InpCloseHourNY": 23,
     "InpCloseMinuteNY": 0,
     "InpCloseBufferMinutes": 5,
     "InpFridayCloseBufferMinutes": 10,
@@ -53,17 +53,42 @@ def write_preset(config):
     print(f"Preset written to {PRESET_PATH}")
 
 
+def terminal_is_running():
+    """Evite de lancer un 2e terminal : MT5 doit rester mono-instance."""
+    try:
+        result = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq terminal64.exe"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        return "terminal64.exe" in (result.stdout or "").lower()
+    except Exception:
+        return False
+
+
 def launch_terminal():
     terminal_path = Path(r"C:\Program Files\MetaTrader 5\terminal64.exe")
     if not terminal_path.exists():
         terminal_path = Path(r"C:\Program Files (x86)\MetaTrader 5\terminal64.exe")
-    
+
     if not terminal_path.exists():
         print("ERROR: MT5 terminal not found")
         sys.exit(1)
-    
-    print(f"Launching MT5 terminal: {terminal_path}")
-    subprocess.Popen([str(terminal_path)], shell=True)
+
+    if terminal_is_running():
+        print("MT5 already running -> no second instance launched.")
+        return
+
+    start_ini = DATA_PATH / "PRESSURE_start.ini"
+    cmd = [str(terminal_path)]
+    if start_ini.exists():
+        cmd.append(f"/config:{start_ini}")
+        print(f"Launching MT5 terminal with config: {start_ini}")
+    else:
+        print(f"WARNING: {start_ini} not found, launching without auto-attach")
+        print(f"Launching MT5 terminal: {terminal_path}")
+    subprocess.Popen(cmd)
 
 
 def main():

@@ -34,17 +34,27 @@ Write-Host "[2/4] Launching MT5 with Pressure config..." -ForegroundColor Yellow
 C:\Python314\python.exe tools\launch_pressure_demo.py --risk 0.5 --target 2.0 --max-trades 10 --buy-pressure 0.6 --sell-pressure 0.6 --pressure-bars 3
 Start-Sleep -Seconds 10
 
-# Étape 3: Backend Flask
+# Étape 3: Backend Flask (ne pas relancer si déjà actif)
 Write-Host ""
-Write-Host "[3/4] Starting Flask Backend..." -ForegroundColor Yellow
-Start-Process cmd -ArgumentList "/k", "cd /d c:\Users\moham\Downloads\agency-agents-main\agency-agents-main && C:\Python314\python.exe web\app.py --port 8050" -WindowStyle Normal
-Start-Sleep -Seconds 3
+Write-Host "[3/4] Checking Flask Backend..." -ForegroundColor Yellow
+$backend = Get-NetTCPConnection -LocalPort 8050 -State Listen -ErrorAction SilentlyContinue
+if ($backend) {
+    Write-Host "[OK] Backend already running (PID $($backend.OwningProcess))" -ForegroundColor Green
+} else {
+    Start-Process cmd -ArgumentList "/k", "cd /d c:\Users\moham\Downloads\agency-agents-main\agency-agents-main && C:\Python314\python.exe web\app.py --port 8050" -WindowStyle Normal
+    Start-Sleep -Seconds 3
+}
 
-# Étape 4: Tunnel Cloudflare
+# Étape 4: Tunnel Cloudflare (ne pas relancer si déjà actif)
 Write-Host ""
-Write-Host "[4/4] Starting Cloudflare Tunnel..." -ForegroundColor Yellow
-Start-Process cmd -ArgumentList "/k", "cloudflared tunnel --url http://127.0.0.1:8050 --no-autoupdate" -WindowStyle Normal
-Start-Sleep -Seconds 3
+Write-Host "[4/4] Checking Cloudflare Tunnel..." -ForegroundColor Yellow
+$tunnel = Get-Process cloudflared -ErrorAction SilentlyContinue
+if ($tunnel) {
+    Write-Host "[OK] Tunnel already running (PID $($tunnel[0].Id))" -ForegroundColor Green
+} else {
+    Start-Process cmd -ArgumentList "/k", "cloudflared tunnel --url http://127.0.0.1:8050 --no-autoupdate" -WindowStyle Normal
+    Start-Sleep -Seconds 3
+}
 
 # Ouvrir dashboard
 Write-Host ""

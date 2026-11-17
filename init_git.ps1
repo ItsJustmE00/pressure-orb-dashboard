@@ -15,39 +15,43 @@ if (-not (Test-Path .git)) {
     Write-Host "[OK] Git repository already exists" -ForegroundColor Green
 }
 
+# Identité locale obligatoire pour pouvoir committer
+if (-not (git config user.name)) {
+    git config user.name "Moham"
+    Write-Host "[OK] Local user.name configured" -ForegroundColor Green
+}
+if (-not (git config user.email)) {
+    git config user.email "moham@example.com"
+    Write-Host "[OK] Local user.email configured" -ForegroundColor Green
+}
+
 # Étape 2: Ajouter les fichiers
 Write-Host ""
 Write-Host "[2/3] Adding files to Git..." -ForegroundColor Yellow
 git add .
-git commit -m "Pressure ORB Dashboard - Fixed money management, pressure metrics, Vercel deployment"
-Write-Host "[OK] Files committed" -ForegroundColor Green
+$staged = git diff --cached --name-only
+if ($staged) {
+    git commit -m "Pressure ORB Dashboard - Fixed money management, pressure metrics, Vercel deployment"
+    Write-Host "[OK] Files committed" -ForegroundColor Green
+} else {
+    Write-Host "[OK] Nothing to commit" -ForegroundColor Green
+}
 
-# Étape 3: Instructions pour GitHub
+# Étape 3: Remote GitHub et push
 Write-Host ""
 Write-Host "[3/3] GitHub setup..." -ForegroundColor Yellow
 $remote = git remote get-url origin 2>$null
-if ($remote) {
-    Write-Host "[OK] Remote already configured: $remote" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "Pushing to GitHub..." -ForegroundColor Yellow
-    git push -u origin main
-} else {
-    Write-Host "[WARN] No Git remote configured" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "Please follow these steps:" -ForegroundColor White
-    Write-Host "1. Create a new repository on GitHub: https://github.com/new" -ForegroundColor Gray
-    Write-Host "   - Repository name: pressure-orb-dashboard" -ForegroundColor Gray
-    Write-Host "   - Make it Public (for free Vercel deployment)" -ForegroundColor Gray
-    Write-Host "   - DO NOT initialize with README" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "2. Add the remote:" -ForegroundColor White
-    Write-Host "   git remote add origin https://github.com/YOUR_USERNAME/pressure-orb-dashboard.git" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "3. Push to GitHub:" -ForegroundColor White
-    Write-Host "   git push -u origin main" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "4. Then run: .\deploy_github.ps1" -ForegroundColor White
+if (-not $remote) {
+    git remote add origin "https://ItsJustmE00@github.com/ItsJustmE00/pressure-orb-dashboard.git"
+    $remote = git remote get-url origin
 }
+Write-Host "[OK] Remote configured: $remote" -ForegroundColor Green
+git branch -M main
+if (-not (git rev-parse --verify HEAD 2>$null)) {
+    git commit --allow-empty -m "Initial commit"
+}
+Write-Host "Pushing to GitHub..." -ForegroundColor Yellow
+git push -u origin main
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Green

@@ -29,15 +29,25 @@ Start-Sleep -Seconds 10
 # Note: Auto-attach script must be run manually from MT5 Navigator
 # We'll provide clear instructions
 
-# Étape 5: Backend Flask
-Write-Host "[5/6] Starting Flask Backend..." -ForegroundColor Yellow
-Start-Process cmd -ArgumentList "/k", "cd /d c:\Users\moham\Downloads\agency-agents-main\agency-agents-main && C:\Python314\python.exe web\app.py --port 8050" -WindowStyle Normal
-Start-Sleep -Seconds 5
+# Étape 5: Backend Flask (ne pas relancer si déjà actif)
+Write-Host "[5/6] Checking Flask Backend..." -ForegroundColor Yellow
+$backend = Get-NetTCPConnection -LocalPort 8050 -State Listen -ErrorAction SilentlyContinue
+if ($backend) {
+    Write-Host "[OK] Backend already running (PID $($backend.OwningProcess))" -ForegroundColor Green
+} else {
+    Start-Process cmd -ArgumentList "/k", "cd /d c:\Users\moham\Downloads\agency-agents-main\agency-agents-main && C:\Python314\python.exe web\app.py --port 8050" -WindowStyle Normal
+    Start-Sleep -Seconds 5
+}
 
-# Étape 6: Tunnel Cloudflare
-Write-Host "[6/6] Starting Cloudflare Tunnel..." -ForegroundColor Yellow
-Start-Process cmd -ArgumentList "/k", "cloudflared tunnel --url http://127.0.0.1:8050 --no-autoupdate" -WindowStyle Normal
-Start-Sleep -Seconds 5
+# Étape 6: Tunnel Cloudflare (ne pas relancer si déjà actif)
+Write-Host "[6/6] Checking Cloudflare Tunnel..." -ForegroundColor Yellow
+$tunnel = Get-Process cloudflared -ErrorAction SilentlyContinue
+if ($tunnel) {
+    Write-Host "[OK] Tunnel already running (PID $($tunnel[0].Id))" -ForegroundColor Green
+} else {
+    Start-Process cmd -ArgumentList "/k", "cloudflared tunnel --url http://127.0.0.1:8050 --no-autoupdate" -WindowStyle Normal
+    Start-Sleep -Seconds 5
+}
 
 # Ouvrir dashboard
 Write-Host "Opening local dashboard..." -ForegroundColor Green
