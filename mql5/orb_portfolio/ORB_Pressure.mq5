@@ -190,6 +190,54 @@ double CalculatePressure(int bars_count)
    return buy_pressure;
 }
 
+bool RestoreOpeningRange(datetime ny_now)
+{
+   datetime day_start = NYDate(ny_now);
+   MqlDateTime d;
+   TimeToStruct(day_start, d);
+   datetime range_start_ny = MakeTime(d.year, d.mon, d.day, InpRangeHourNY, InpRangeMinuteNY);
+   datetime range_start = NYToUTC(range_start_ny);
+
+   MqlRates rates[];
+   ArraySetAsSeries(rates, true);
+   int copied = CopyRates(_Symbol, PERIOD_M15, range_start, range_start + 15 * 60 - 1, rates);
+   for(int i = 0; i < copied; i++)
+   {
+      if((datetime)rates[i].time == range_start)
+      {
+         g_high = rates[i].high;
+         g_low = rates[i].low;
+         g_range_ready = true;
+         Print("PRESSURE range restored: high=", g_high, " low=", g_low);
+         return true;
+      }
+   }
+   return false;
+}
+
+int CountTradesToday(datetime ny_now)
+{
+   datetime day_start = NYDate(ny_now);
+   datetime from = NYToUTC(day_start);
+   if(!HistorySelect(from, TimeCurrent()))
+      return 0;
+
+   int count = 0;
+   int total = HistoryDealsTotal();
+   for(int i = 0; i < total; i++)
+   {
+      ulong ticket = HistoryDealGetTicket(i);
+      if(ticket == 0)
+         continue;
+      if((int)HistoryDealGetInteger(ticket, DEAL_MAGIC) != InpMagic)
+         continue;
+      if((int)HistoryDealGetInteger(ticket, DEAL_ENTRY) != DEAL_ENTRY_IN)
+         continue;
+      count++;
+   }
+   return count;
+}
+
 bool EnterTrade(ENUM_ORDER_TYPE side, double entry, double stop, double target)
 {
    long stops_level = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
@@ -291,8 +339,12 @@ void ResetDay(datetime day)
 int OnInit()
 {
    g_base_equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   datetime ny_now = UTCToNY(TimeCurrent());
+   g_day = NYDate(ny_now);
+   g_trades_today = CountTradesToday(ny_now);
    Print("PRESSURE ORB initialized, base equity=", g_base_equity, " symbol=", _Symbol);
    Print("Trading hours: ", InpRangeHourNY, ":", InpRangeMinuteNY, " NY to ", InpCloseHourNY, ":", InpCloseMinuteNY, " NY");
+   Print("PRESSURE trades today restored=", g_trades_today);
    return INIT_SUCCEEDED;
 }
 
@@ -333,7 +385,11 @@ void OnTick()
    int range_start_min = InpRangeHourNY * 60 + InpRangeMinuteNY;
    int range_end_min = range_start_min + 15;
    int current_min = nyd.hour * 60 + nyd.min;
-   
+
+   // Apres un redemarrage, reconstruire le range depuis la bougie M15 de 09:30 NY.
+   if(!g_range_ready && current_min >= range_start_min)
+      RestoreOpeningRange(ny_now);
+
    if(current_min >= range_start_min && current_min < range_end_min)
    {
       double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
