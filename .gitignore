@@ -93,3 +93,6 @@ data_live/
 tools/telegram.env
 data_crypto/
 
+.vercel
+out_*.log
+out_*.log.err

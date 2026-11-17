@@ -108,7 +108,7 @@ def _call(fn):
         try:
             return fn()
         except Exception as exc:
-            global _CONNECTED
+            global _CONNECTED, _LAST_ERROR
             _CONNECTED = False
             _LAST_ERROR = str(exc)
             return None
@@ -264,14 +264,20 @@ def _market(symbol_tick):
 
 def _ea_state(term_lines, config):
     pattern = re.compile(
-        r"expert ORB_Portfolio .* loaded successfully|ORB_Portfolio loaded|"
-        r"inputs read from expert 'ORB_Portfolio'",
+        r"expert (ORB_Pressure|ORB_Portfolio) .* loaded successfully|"
+        r"(ORB_Pressure|ORB_Portfolio) loaded|"
+        r"inputs read from expert '(ORB_Pressure|ORB_Portfolio)'",
         re.IGNORECASE,
     )
     matches = [line for line in term_lines if pattern.search(line)]
     last = matches[-1] if matches else None
+    name = None
+    if last:
+        found = re.search(r"(ORB_Pressure|ORB_Portfolio)", last, re.IGNORECASE)
+        name = found.group(1) if found else None
     return {
         "loaded": bool(last),
+        "name": name,
         "last_line": last,
         "preset": str(PRESET),
         "preset_exists": PRESET.exists(),
@@ -402,7 +408,6 @@ def _live_read():
         logs = _read_logs()
         for line in reversed(logs):
             if "PRESSURE range high=" in line:
-                import re
                 match = re.search(r"high=([\d.]+)\s+low=([\d.]+)", line)
                 if match:
                     range_high = float(match.group(1))
