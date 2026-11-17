@@ -9,11 +9,28 @@ Surveille la chaine live et relance automatiquement les composants critiques.
   relance MT5 avec `PRESSURE_start.ini` (EA `ORB_Pressure` sur USTECm M15).
 - Si le backend Flask ne repond plus sur le port `8050` : le relance en arriere-plan
   (logs dans `logs/backend.out.log` et `logs/backend.err.log`).
-- Si `cloudflared` est absent : ecrit un avertissement, sans recreer le tunnel
-  (une relance du quick tunnel changerait l'URL et casserait `dashboard/config.js`).
+- Si `cloudflared` est absent : ecrit un avertissement (le renouvellement du tunnel
+  est assure par **ORB Tunnel Keeper**, voir plus bas).
 - Si le terminal tourne mais que l'EA n'est pas charge : avertissement dans le log.
 
 Hors session NY, MT5 n'est pas relance automatiquement.
+
+## Renouvellement du quick tunnel
+
+Le quick tunnel Cloudflare (`trycloudflare.com`) est gratuit mais ephemere. La tache
+planifiee **ORB Tunnel Keeper** execute `tools/quick_tunnel.ps1 -Check` toutes les
+5 minutes :
+
+1. verifie que l'URL de `dashboard/config.js` repond sur `/api/health` ;
+2. verifie que Vercel sert bien cette meme URL ;
+3. si le tunnel est mort, demarre un **candidat** sans couper l'ancien ;
+4. attend que le candidat soit reellement joignable (propagation DNS) ;
+5. met a jour `dashboard/config.js`, redéploie Vercel, puis seulement ensuite
+   arrete l'ancien tunnel ;
+6. commit et pousse `dashboard` et le depot principal.
+
+Le candidat et son PID sont conserves dans `logs/quick_tunnel_state.json` : si une
+bascule est interrompue, la verification suivante reprend la finalisation.
 
 ## Commandes utiles
 
@@ -30,6 +47,14 @@ Enable-ScheduledTask  -TaskName 'ORB Watchdog'
 
 # Etat de la tache
 Get-ScheduledTaskInfo -TaskName 'ORB Watchdog'
+
+# Tunnel : etat, verification, renouvellement force
+.\tools\quick_tunnel.ps1 -Status
+.\tools\quick_tunnel.ps1 -Check
+.\tools\quick_tunnel.ps1 -Renew
+
+# Etat de la tache tunnel
+Get-ScheduledTaskInfo -TaskName 'ORB Tunnel Keeper'
 ```
 
 ## Notes
@@ -38,5 +63,7 @@ Get-ScheduledTaskInfo -TaskName 'ORB Watchdog'
   `terminal64.exe` est deja present.
 - L'EA restaure le range 09:30 NY et le nombre de trades du jour depuis l'historique
   apres un redemarrage, donc une relance ne bloque plus la journee.
-- Ne pas relancer `cloudflared` sans mettre a jour `dashboard/config.js` et redeployer
-  le frontend Vercel.
+- Ne pas lancer `cloudflared` manuellement : passer par `tools/quick_tunnel.ps1`
+  pour que `dashboard/config.js` et Vercel restent synchronises.
+- Le renouvellement peut prendre 1 a 2 minutes (creation du tunnel + propagation DNS
+  + deploiement Vercel). L'ancien tunnel reste actif pendant cette phase.
