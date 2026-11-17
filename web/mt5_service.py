@@ -376,6 +376,26 @@ def _calculate_pressure(bars_count=3):
         }
 
 
+def _calculate_opening_range():
+    """High/low de la bougie M15 de 09:30 NY, reference du range ORB de l'EA."""
+    try:
+        rates = mt5.copy_rates_from_pos(SYMBOL, mt5.TIMEFRAME_M15, 0, 300)
+        if rates is None:
+            return None, None
+        today_ny = datetime.now(NY).date()
+        for rate in reversed(rates):
+            bar_ny = datetime.fromtimestamp(int(rate[0]), UTC).astimezone(NY)
+            if (
+                bar_ny.date() == today_ny
+                and bar_ny.hour == 9
+                and bar_ny.minute == 30
+            ):
+                return float(rate[2]), float(rate[3])
+    except Exception:
+        pass
+    return None, None
+
+
 def _live_read():
     account = mt5.account_info()
     terminal = mt5.terminal_info()
@@ -401,20 +421,20 @@ def _live_read():
     # Calculate pressure from candles
     pressure = _calculate_pressure(bars_count=3)
     
-    # Get range from EA logs if available
-    range_high = None
-    range_low = None
-    try:
-        logs = _read_logs()
-        for line in reversed(logs):
-            if "PRESSURE range high=" in line:
-                match = re.search(r"high=([\d.]+)\s+low=([\d.]+)", line)
-                if match:
-                    range_high = float(match.group(1))
-                    range_low = float(match.group(2))
-                    break
-    except:
-        pass
+    # Range ORB depuis la bougie M15 09:30 NY, fallback sur les logs EA
+    range_high, range_low = _calculate_opening_range()
+    if range_high is None:
+        try:
+            logs = _read_logs()
+            for line in reversed(logs):
+                if "PRESSURE range high=" in line:
+                    match = re.search(r"high=([\d.]+)\s+low=([\d.]+)", line)
+                    if match:
+                        range_high = float(match.group(1))
+                        range_low = float(match.group(2))
+                        break
+        except Exception:
+            pass
     
     pressure["range_high"] = range_high
     pressure["range_low"] = range_low
