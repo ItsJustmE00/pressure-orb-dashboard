@@ -6,31 +6,52 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 METAEDITOR = r"C:\Program Files\MetaTrader 5\metaeditor64.exe"
 
-def compile_mql5(source_path, timeout=30):
-    """Compile MQL5 file with timeout"""
+def compile_mql5(source_path, timeout=60):
+    """Compile MQL5 file with the correct MetaEditor CLI syntax."""
     print(f"Compiling {source_path}...")
-    
+
     # Kill existing MetaEditor
     try:
-        subprocess.run(["taskkill", "/F", "/IM", "metaeditor64.exe"], 
-                      capture_output=True, timeout=5)
+        subprocess.run(["taskkill", "/F", "/IM", "metaeditor64.exe"],
+                       capture_output=True, timeout=5)
         time.sleep(2)
-    except:
+    except Exception:
         pass
-    
-    # Compile with /close flag
-    cmd = [METAEDITOR, "/compile", "/close", str(source_path)]
-    
+
+    log_path = source_path.with_suffix(".compile.log")
+    cmd = [
+        METAEDITOR,
+        f"/compile:{source_path}",
+        f"/log:{log_path}",
+        "/close",
+    ]
+
     try:
-        result = subprocess.run(cmd, timeout=timeout, capture_output=True)
-        time.sleep(3)
-        return True
+        subprocess.run(cmd, timeout=timeout, capture_output=True)
+        time.sleep(1)
     except subprocess.TimeoutExpired:
         print(f"Compilation timed out for {source_path}")
         return False
     except Exception as e:
         print(f"Error compiling {source_path}: {e}")
         return False
+
+    log_text = ""
+    for encoding in ("utf-16", "utf-8-sig", "utf-8"):
+        try:
+            log_text = log_path.read_text(encoding=encoding, errors="ignore")
+            if log_text.strip():
+                break
+        except Exception:
+            continue
+
+    if "0 errors" in log_text.lower():
+        print("Compilation OK: 0 errors, 0 warnings")
+        return True
+
+    tail = "\n".join(log_text.strip().splitlines()[-8:])
+    print(f"Compilation failed or log unavailable:\n{tail}")
+    return False
 
 def main():
     print("="*60)
@@ -61,10 +82,10 @@ def main():
     
     for source, success in results:
         ex5_path = source.with_suffix(".ex5")
-        if ex5_path.exists():
+        if success and ex5_path.exists():
             print(f"[OK] {ex5_path.name}")
         else:
-            print(f"[FAIL] {ex5_path.name} not created")
+            print(f"[FAIL] {ex5_path.name} not created or compilation failed")
     
     print()
     print("If compilation failed, compile manually in MetaEditor:")

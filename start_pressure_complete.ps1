@@ -6,15 +6,28 @@ Write-Host "PRESSURE ORB - COMPLETE AUTO LAUNCH" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
+$metaeditor = "C:\Program Files\MetaTrader 5\metaeditor64.exe"
+$root = (Get-Location).Path
+
 # Étape 1: Compiler l'EA
 Write-Host "[1/6] Compiling ORB_Pressure EA..." -ForegroundColor Yellow
-& "C:\Program Files\MetaTrader 5\metaeditor64.exe" /compile /log "mql5\orb_portfolio\ORB_Pressure.mq5"
-Start-Sleep -Seconds 5
+& $metaeditor "/compile:$root\mql5\orb_portfolio\ORB_Pressure.mq5" "/log:$root\mql5\orb_portfolio\ORB_Pressure_compile.log" /close
+Start-Sleep -Seconds 2
+$eaLog = "$root\mql5\orb_portfolio\ORB_Pressure_compile.log"
+if ((Test-Path $eaLog) -and ((Get-Content $eaLog -Raw) -match '0 errors')) {
+    Write-Host "[OK] EA compiled: 0 errors" -ForegroundColor Green
+} else {
+    Write-Host "[WARN] Verifier $eaLog" -ForegroundColor Yellow
+}
 
-# Étape 2: Compiler le script d'ouverture de graphique
+# Étape 2: Compiler le script d'ouverture de graphique (si present)
 Write-Host "[2/6] Compiling chart open script..." -ForegroundColor Yellow
-& "C:\Program Files\MetaTrader 5\metaeditor64.exe" /compile /log "mql5\Scripts\Open_USTECm_M15.mq5"
-Start-Sleep -Seconds 3
+if (Test-Path "$root\mql5\Scripts\Open_USTECm_M15.mq5") {
+    & $metaeditor "/compile:$root\mql5\Scripts\Open_USTECm_M15.mq5" "/log:$root\mql5\Scripts\Open_USTECm_M15_compile.log" /close
+    Start-Sleep -Seconds 2
+} else {
+    Write-Host "[SKIP] Open_USTECm_M15.mq5 introuvable" -ForegroundColor Yellow
+}
 
 # Étape 3: Lancer MT5 avec config
 Write-Host "[3/6] Launching MT5 Terminal with Pressure config..." -ForegroundColor Yellow
