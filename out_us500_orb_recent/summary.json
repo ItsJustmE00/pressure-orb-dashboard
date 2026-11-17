@@ -1,0 +1,28 @@
+{
+  "bars": "data_live\\us500_m15.parquet",
+  "days": 355,
+  "first": "2025-09-21 22:00:00+00:00",
+  "last": "2026-11-09 02:00:00+00:00",
+  "risk_pct": 0.005,
+  "account": 24592.71,
+  "cost_points": 0.8,
+  "best": {
+    "range_bars": 1.0,
+    "target_r": 4.0,
+    "trades": 266.0,
+    "trade_days": 266.0,
+    "all_days": 355.0,
+    "win_rate": 0.39473684210526316,
+    "avg_r": 0.1073531302597574,
+    "total_pnl": 2747.104957446862,
+    "mean_per_all_day": 7.738323823793979,
+    "mean_per_trade_day": 10.327462246040835,
+    "median_per_trade_day": -97.57968112070792,
+    "t_trade_day": 0.9229805253639017,
+    "max_dd": 1418.4372622023495
+  },
+  "max_positive_t": 0.9327860109983782,
+  "p_adjusted": 0.3263368315842079,
+  "target_50_per_day": false,
+  "required_risk_note": "mean_per_all_day is at 0.5% risk per trade; scaling risk scales PnL and drawdown"
+}

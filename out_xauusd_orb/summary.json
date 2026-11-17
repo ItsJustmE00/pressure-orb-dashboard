@@ -1,0 +1,28 @@
+{
+  "bars": "data_live\\xauusd_m15_kaggle_utc.parquet",
+  "days": 6652,
+  "first": "2004-06-11 04:15:00+00:00",
+  "last": "2026-01-30 20:45:00+00:00",
+  "risk_pct": 0.005,
+  "account": 24592.71,
+  "cost_points": 0.4,
+  "best": {
+    "range_bars": 1.0,
+    "target_r": 4.0,
+    "trades": 4987.0,
+    "trade_days": 4987.0,
+    "all_days": 6652.0,
+    "win_rate": 0.3603368758772809,
+    "avg_r": -0.04326062151083352,
+    "total_pnl": -25853.187069136817,
+    "mean_per_all_day": -3.886528422900904,
+    "mean_per_trade_day": -5.184116115728257,
+    "median_per_trade_day": -129.6828696721312,
+    "t_trade_day": -1.8521852990795136,
+    "max_dd": 34241.75575377425
+  },
+  "max_positive_t": -1.8521474792255728,
+  "p_adjusted": 0.9975012493753124,
+  "target_50_per_day": false,
+  "required_risk_note": "mean_per_all_day is at 0.5% risk per trade; scaling risk scales PnL and drawdown"
+}

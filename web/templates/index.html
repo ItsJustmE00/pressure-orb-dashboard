@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1120">
+  <title>ORB Control · USTECm</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+        <span class="brand-text">
+          <strong>ORB</strong>
+          <small>Control</small>
+        </span>
+      </a>
+
+      <nav class="nav" aria-label="Navigation principale">
+        <button class="nav-link active" data-view="overview" type="button">
+          <span class="nav-icon">01</span>
+          <span>Vue d'ensemble</span>
+        </button>
+        <button class="nav-link" data-view="results" type="button">
+          <span class="nav-icon">02</span>
+          <span>Résultats</span>
+        </button>
+        <button class="nav-link" data-view="analysis" type="button">
+          <span class="nav-icon">03</span>
+          <span>Analyse</span>
+        </button>
+        <button class="nav-link" data-view="journal" type="button">
+          <span class="nav-icon">04</span>
+          <span>Journal</span>
+        </button>
+        <button class="nav-link" data-view="config" type="button">
+          <span class="nav-icon">05</span>
+          <span>Configuration</span>
+        </button>
+      </nav>
+
+      <div class="side-card">
+        <div class="side-card-head">
+          <span class="status-dot" id="side-dot"></span>
+          <span id="side-status">Connexion…</span>
+        </div>
+        <p id="side-detail">Lecture de l'état MT5.</p>
+        <div class="side-divider"></div>
+        <div class="side-line">
+          <span>Compte</span>
+          <strong id="side-login">—</strong>
+        </div>
+        <div class="side-line">
+          <span>Risque</span>
+          <strong id="side-risk">0,5 %</strong>
+        </div>
+      </div>
+
+      <div class="side-foot">
+        <span class="demo-badge">DÉMO</span>
+        <p>Aucun ordre réel. Forward test et recherche uniquement.</p>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="title-wrap">
+          <p class="eyebrow">Forward test · Exness demo · USTECm M15</p>
+          <h1>ORB BOTH <span>0,5 %</span></h1>
+        </div>
+        <div class="top-actions">
+          <div class="clock-box">
+            <span class="clock" id="clock">--:--:--</span>
+            <small>New York</small>
+          </div>
+          <div class="market-pill" id="market-pill">
+            <span class="status-dot"></span>
+            <span id="market-label">Connexion…</span>
+          </div>
+          <button class="btn" id="refresh" type="button">
+            <span class="btn-icon" aria-hidden="true">↻</span>
+            Actualiser
+          </button>
+        </div>
+      </header>
+
+      <div class="error-banner hidden" id="error-banner"></div>
+
+      <section class="view active" id="view-overview">
+        <div class="hero-grid">
+          <article class="hero-card">
+            <div class="hero-top">
+              <div>
+                <p class="eyebrow">Équity du compte démo</p>
+                <div class="hero-value" id="equity">—</div>
+              </div>
+              <div class="hero-side">
+                <span class="tag tag-soft" id="account-server">MT5</span>
+                <span class="hero-updated" id="last-update">—</span>
+              </div>
+            </div>
+            <div class="hero-metrics">
+              <div>
+                <span>Solde</span>
+                <strong id="balance">—</strong>
+              </div>
+              <div>
+                <span>P&L du jour</span>
+                <strong id="day-pnl">—</strong>
+              </div>
+              <div>
+                <span>P&L flottant</span>
+                <strong id="open-pnl">—</strong>
+              </div>
+              <div>
+                <span>Marge libre</span>
+                <strong id="free-margin">—</strong>
+              </div>
+            </div>
+            <div class="hero-foot">
+              <span id="hero-status">Lecture de la session…</span>
+              <span id="hero-next">—</span>
+            </div>
+          </article>
+
+          <article class="execution-card card">
+            <div class="card-head">
+              <div>
+                <p class="eyebrow">État d'exécution</p>
+                <h2>Fenêtre de trading</h2>
+              </div>
+              <span class="tag" id="ea-tag">EA</span>
+            </div>
+            <div class="timeline" id="timeline">
+              <div class="timeline-step" data-step="pre">
+                <span class="timeline-dot"></span>
+                <div>
+                  <strong>09:30</strong>
+                  <small>Opening range M15</small>
+                </div>
+              </div>
+              <div class="timeline-step" data-step="range">
+                <span class="timeline-dot"></span>
+                <div>
+                  <strong>09:45</strong>
+                  <small>Filtres et cassure</small>
+                </div>
+              </div>
+              <div class="timeline-step" data-step="entry">
+                <span class="timeline-dot"></span>
+                <div>
+                  <strong>15:55</strong>
+                  <small>Clôture de sécurité</small>
+                </div>
+              </div>
+            </div>
+            <div class="execution-rows">
+              <div><span>Phase</span><strong id="phase-label">—</strong></div>
+              <div><span>Prochain jalon</span><strong id="next-event">—</strong></div>
+              <div><span>Spread</span><strong id="spread">—</strong></div>
+              <div><span>Bid / Ask</span><strong id="bid-ask">—</strong></div>
+            </div>
+            <div class="execution-note" id="execution-note">
+              La fenêtre ORB se prépare à 09:30 NY. Le bot attend la cassure validée.
+            </div>
+          </article>
+        </div>
+
+        <div class="metrics-grid">
+          <article class="metric-card">
+            <span class="metric-label">Positions ouvertes</span>
+            <strong class="metric-value" id="positions-count">—</strong>
+            <span class="metric-sub" id="positions-sub">—</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">Trades du jour</span>
+            <strong class="metric-value" id="trades-count">—</strong>
+            <span class="metric-sub" id="trades-sub">—</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">Risque par trade</span>
+            <strong class="metric-value" id="risk-value">—</strong>
+            <span class="metric-sub" id="risk-money">—</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">DD OOS 0,5 %</span>
+            <strong class="metric-value" id="oos-dd">—</strong>
+            <span class="metric-sub">règle de 10 %</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">R moyen OOS</span>
+            <strong class="metric-value" id="oos-r">—</strong>
+            <span class="metric-sub" id="oos-trades">—</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">Dernier ping</span>
+            <strong class="metric-value" id="ping">—</strong>
+            <span class="metric-sub" id="build">—</span>
+          </article>
+        </div>
+
+        <div class="two-col">
+          <article class="card chart-card">
+            <div class="card-head chart-head">
+              <div>
+                <p class="eyebrow">Courbe de capital</p>
+                <h2 id="chart-title">OOS 0,5 %</h2>
+                <p class="card-sub" id="chart-sub">—</p>
+              </div>
+              <div class="chart-tabs" id="chart-tabs"></div>
+            </div>
+            <div class="chart-wrap">
+              <svg id="equity-chart" viewBox="0 0 900 320" role="img" aria-label="Courbe de capital"></svg>
+              <div class="chart-tip hidden" id="chart-tip"></div>
+            </div>
+            <div class="chart-stats">
+              <div><span>Rendement</span><strong id="chart-return">—</strong></div>
+              <div><span>Max DD</span><strong id="chart-dd">—</strong></div>
+              <div><span>Dernière valeur</span><strong id="chart-last">—</strong></div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <p class="eyebrow">Session en cours</p>
+                <h2>Positions</h2>
+              </div>
+              <span class="tag" id="positions-tag">0</span>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table compact">
+                <thead>
+                  <tr><th>Symbole</th><th>Sens</th><th>Volume</th><th>Entrée</th><th>P&L</th></tr>
+                </thead>
+                <tbody id="positions-body">
+                  <tr><td colspan="5" class="empty">Aucune position ouverte.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="session-summary">
+              <div><span>Réalisé jour</span><strong id="realized-day">—</strong></div>
+              <div><span>Gagnants / perdants</span><strong id="win-loss">—</strong></div>
+            </div>
+            <div class="table-wrap spaced">
+              <table class="data-table compact">
+                <thead>
+                  <tr><th>Heure</th><th>Type</th><th>Symbole</th><th>P&L</th></tr>
+                </thead>
+                <tbody id="deals-body">
+                  <tr><td colspan="4" class="empty">Aucun deal aujourd'hui.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="view" id="view-results">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Performance validée</p>
+            <h2>Résultats</h2>
+            <p>Tests directs MT5 et simulation OOS 2016-2026. Dépôt de référence : 57 000 USD.</p>
+          </div>
+          <a class="btn btn-ghost" href="/report" target="_blank" rel="noopener">Rapport complet</a>
+        </div>
+
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">Strategy Tester</p>
+              <h3>Trades réels MT5</h3>
+            </div>
+            <span class="tag tag-soft" id="direct-source">report.md</span>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Variante</th><th>Période</th><th>Risque</th><th>Trades</th>
+                  <th>Gagnants</th><th>R moyen</th><th>Max DD</th><th>Final</th><th>$/jour</th><th>Statut</th>
+                </tr>
+              </thead>
+              <tbody id="direct-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <div class="two-col results-grid">
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <p class="eyebrow">Simulation bar-level</p>
+                <h3>OOS 2022-2025</h3>
+              </div>
+              <span class="tag tag-good">0,5 %</span>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table compact">
+                <thead>
+                  <tr><th>Période</th><th>Trades</th><th>R moyen</th><th>Rendement</th><th>Max DD</th></tr>
+                </thead>
+                <tbody id="oos-body"></tbody>
+              </table>
+            </div>
+            <p class="card-note" id="oos-note"></p>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <p class="eyebrow">Stress de coûts</p>
+                <h3>OOS à 5,1 points</h3>
+              </div>
+              <span class="tag tag-warn">stress</span>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table compact">
+                <thead>
+                  <tr><th>Période</th><th>Trades</th><th>R moyen</th><th>Rendement</th><th>Max DD</th></tr>
+                </thead>
+                <tbody id="stress-body"></tbody>
+              </table>
+            </div>
+            <p class="card-note">L'IS devient négatif à coût élevé : l'edge n'est pas stable avant 2022.</p>
+          </article>
+        </div>
+
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">Frontière de risque</p>
+              <h3>Rendement contre drawdown</h3>
+            </div>
+            <span class="tag tag-warn">OOS 2022-2025</span>
+          </div>
+          <div class="risk-grid" id="risk-grid"></div>
+          <p class="card-note">Aucun réglage testé ne donne 50 $/jour sous 10 % de drawdown sur ce seul instrument.</p>
+        </article>
+
+        <article class="callout">
+          <div class="callout-icon">!</div>
+          <div>
+            <strong>Calibration bar-level</strong>
+            <p id="calibration-text">—</p>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">Derniers trades simulés</p>
+              <h3>OOS 0,5 %</h3>
+            </div>
+            <span class="tag" id="recent-count">—</span>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table compact">
+              <thead>
+                <tr><th>Date</th><th>Sens</th><th>Entrée</th><th>Sortie</th><th>R</th><th>P&L</th><th>Motif</th></tr>
+              </thead>
+              <tbody id="recent-trades-body"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="view" id="view-analysis">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Lecture de l'edge</p>
+            <h2>Analyse</h2>
+            <p>Ce qui est testé, ce qui est retenu et ce qui reste fragile.</p>
+          </div>
+        </div>
+
+        <div class="analysis-grid">
+          <article class="card">
+            <div class="card-head">
+              <div><p class="eyebrow">Règle de base</p><h3>Opening range breakout</h3></div>
+              <span class="tag tag-soft">M15</span>
+            </div>
+            <ul class="rule-list">
+              <li><span>Range</span><strong>09:30 → 09:45 NY</strong></li>
+              <li><span>Entrée</span><strong>Cassure high / low</strong></li>
+              <li><span>Stop</span><strong>Côté opposé du range</strong></li>
+              <li><span>Target</span><strong>3R</strong></li>
+              <li><span>Clôture</span><strong>15:55 NY · 15:50 vendredi</strong></li>
+              <li><span>Limite</span><strong>1 trade / jour</strong></li>
+            </ul>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div><p class="eyebrow">Filtres retenus</p><h3>Long et short</h3></div>
+              <span class="tag tag-good">BOTH</span>
+            </div>
+            <div class="filter-block">
+              <span class="filter-label">LONG</span>
+              <code>trend &lt; 0,002378</code>
+              <code>or_close_pos &gt; 0,8044</code>
+              <code>prev_mom6 &gt; 0,00123</code>
+            </div>
+            <div class="filter-block">
+              <span class="filter-label short-label">SHORT</span>
+              <code>or_close_pos &lt; 0,1956</code>
+              <code>prev_mom6 &lt; -0,00123</code>
+              <code>trend &gt; -0,00425</code>
+            </div>
+            <p class="card-note">Toutes les features sont connues à 09:45 NY. Aucun OHLC de la barre de déclenchement n'est utilisé.</p>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div><p class="eyebrow">Risque</p><h3>Décision de forward</h3></div>
+              <span class="tag tag-good">0,5 %</span>
+            </div>
+            <div class="decision">
+              <strong>Seul réglage conforme</strong>
+              <p>DD OOS 7,56 %, rendement OOS +15,72 %, environ 6,6 $/jour sur 57 k$. Le 2,5 % atteint 48 $/jour mais 31 % de DD OOS.</p>
+            </div>
+            <div class="decision danger">
+              <strong>Objectif 50 $/jour</strong>
+              <p>Non atteignable sous 10 % de DD avec un seul instrument. Il faut environ 8× plus de capital, plus d'instruments ou un edge plus fréquent.</p>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div><p class="eyebrow">Limite de données</p><h3>Warmup D1</h3></div>
+              <span class="tag tag-warn">à surveiller</span>
+            </div>
+            <div class="warmup-number">360</div>
+            <p class="warmup-label">barres D1 disponibles dans le terminal</p>
+            <p class="card-note">L'EMA20/EMA50 D1 n'est pas amorcée au début du test 12 mois. Trois longs de warmup expliquent l'écart 62 vs 60 trades. La fenêtre 2026 est la plus fiable.</p>
+          </article>
+        </div>
+
+        <article class="card">
+          <div class="card-head">
+            <div><p class="eyebrow">Coûts et calibration</p><h3>Ce que la simulation ne voit pas</h3></div>
+          </div>
+          <div class="analysis-cols">
+            <div>
+              <h4>Coûts testés</h4>
+              <div class="cost-row"><span>Base</span><strong>1,7 point</strong></div>
+              <div class="cost-row"><span>Milieu</span><strong>3,4 points</strong></div>
+              <div class="cost-row"><span>Stress</span><strong>5,1 points</strong></div>
+            </div>
+            <div>
+              <h4>Écarts connus</h4>
+              <p>La simulation bar-level est optimiste d'environ <strong>0,08R/trade</strong>. Le spread bid/ask et la cible short ne sont pas modélisés tick par tick.</p>
+            </div>
+            <div>
+              <h4>Conclusion</h4>
+              <p>Le 0,5 % reste positif après haircut, mais le rendement attendu est de l'ordre de <strong>6-8 $/jour</strong>, pas 50 $/jour.</p>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="view" id="view-journal">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Traçabilité</p>
+            <h2>Journal</h2>
+            <p>Logs MT5, EA et deals du jour. Les lignes sont limitées aux événements utiles.</p>
+          </div>
+        </div>
+
+        <div class="two-col journal-grid">
+          <article class="card">
+            <div class="card-head">
+              <div><p class="eyebrow">Terminal & EA</p><h3>Logs récents</h3></div>
+              <span class="tag" id="log-count">—</span>
+            </div>
+            <div class="log-list" id="log-list">
+              <div class="log-empty">Aucun log disponible.</div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div><p class="eyebrow">Compte démo</p><h3>Deals du jour</h3></div>
+              <span class="tag" id="deals-count">0</span>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table compact">
+                <thead>
+                  <tr><th>Heure NY</th><th>Symbole</th><th>Sens</th><th>Volume</th><th>Prix</th><th>P&L</th></tr>
+                </thead>
+                <tbody id="journal-deals-body">
+                  <tr><td colspan="6" class="empty">Aucun deal aujourd'hui.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="session-summary">
+              <div><span>Réalisé jour</span><strong id="journal-realized">—</strong></div>
+              <div><span>Gagnants / perdants</span><strong id="journal-win-loss">—</strong></div>
+            </div>
+            <div class="card-note">
+              Les deals sont filtrés sur le magic <strong id="journal-magic">20261115</strong>. Les ordres manuels restent hors du périmètre.
+            </div>
+          </article>
+        </div>
+
+        <article class="card">
+          <div class="card-head">
+            <div><p class="eyebrow">Exécution</p><h3>Ordres en attente</h3></div>
+            <span class="tag" id="orders-count">0</span>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table compact">
+              <thead>
+                <tr><th>Symbole</th><th>Sens</th><th>Volume</th><th>Prix</th><th>Magic</th><th>Commentaire</th></tr>
+              </thead>
+              <tbody id="orders-body">
+                <tr><td colspan="6" class="empty">Aucun ordre en attente.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="view" id="view-config">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Paramètres actifs</p>
+            <h2>Configuration</h2>
+            <p>Preset chargé par le terminal : <code>MQL5/Presets/BOTH.set</code>.</p>
+          </div>
+          <span class="tag" id="config-count">—</span>
+        </div>
+
+        <div class="config-grid">
+          <article class="card">
+            <div class="card-head">
+              <div><p class="eyebrow">Inputs EA</p><h3>BOTH.set</h3></div>
+              <span class="tag" id="config-source">UTF-16</span>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table compact config-table">
+                <thead><tr><th>Paramètre</th><th>Valeur</th></tr></thead>
+                <tbody id="config-body">
+                  <tr><td colspan="2" class="empty">Configuration indisponible.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div><p class="eyebrow">Synthèse</p><h3>Décision</h3></div>
+            </div>
+            <div class="config-decision">
+              <span class="tag tag-good">Forward</span>
+              <h3>0,5 % · BOTH</h3>
+              <p>Le risque a été abaissé pour rester sous la règle de 10 % de drawdown. Le 2,5 % n'est pas un forward conforme.</p>
+            </div>
+            <ul class="rule-list">
+              <li><span>Magic</span><strong>20261115</strong></li>
+              <li><span>Instrument</span><strong>USTECm · M15</strong></li>
+              <li><span>Fuseau serveur</span><strong>UTC</strong></li>
+              <li><span>Clôture</span><strong>15:55 NY</strong></li>
+            </ul>
+            <div class="config-links">
+              <a href="/report" target="_blank" rel="noopener">Ouvrir le rapport</a>
+              <a href="/api/config" target="_blank" rel="noopener">API config</a>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <span>ORB Control · recherche et forward test démo</span>
+        <span>Aucun ordre réel autorisé</span>
+      </footer>
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

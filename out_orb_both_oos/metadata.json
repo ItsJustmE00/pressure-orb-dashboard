@@ -1,0 +1,25 @@
+{
+  "account": 57000.0,
+  "tick_value": 1.0,
+  "min_lot": 0.05,
+  "max_lot": 100.0,
+  "target_r": 3.0,
+  "filters": {
+    "long": {
+      "trend_max": 0.002378,
+      "or_close_min": 0.8044,
+      "mom6_min": 0.00123
+    },
+    "short": {
+      "trend_min": -0.00425,
+      "or_close_max": 0.1956,
+      "mom6_max": -0.00123
+    }
+  },
+  "data": {
+    "start": "2016-11-15 03:30:00+00:00",
+    "end": "2026-11-08 23:00:00+00:00",
+    "ny_dates": 3092
+  },
+  "note": "Bar-level BOTH simulation using only the side whose filters pass; no tick bid/ask order flow. EOD close at last M15 close (16:00 NY); eod_bars_back=1 uses 15:45 close as sensitivity. Calibration on the 2025-09-21..2026-09-15 MT5 run shows ~0.08R/trade of bar-level optimism."
+}

@@ -1,0 +1,28 @@
+{
+  "bars": "data_live\\nas100_m15_kaggle_utc.parquet",
+  "days": 2747,
+  "first": "2016-11-15 03:30:00+00:00",
+  "last": "2025-10-01 04:00:00+00:00",
+  "risk_pct": 0.005,
+  "account": 24592.71,
+  "cost_points": 1.7,
+  "best": {
+    "range_bars": 1.0,
+    "target_r": 3.0,
+    "trades": 2137.0,
+    "trade_days": 2137.0,
+    "all_days": 2747.0,
+    "win_rate": 0.3963500233972859,
+    "avg_r": 0.09903577889771353,
+    "total_pnl": 25376.91579832063,
+    "mean_per_all_day": 9.238047250935798,
+    "mean_per_trade_day": 11.875019091399453,
+    "median_per_trade_day": -107.0,
+    "t_trade_day": 3.0784988025586486,
+    "max_dd": 3475.6036387832382
+  },
+  "max_positive_t": 3.0781561915990445,
+  "p_adjusted": 0.004997501249375313,
+  "target_50_per_day": false,
+  "required_risk_note": "mean_per_all_day is at 0.5% risk per trade; scaling risk scales PnL and drawdown"
+}

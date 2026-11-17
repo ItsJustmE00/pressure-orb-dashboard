@@ -1,0 +1,28 @@
+{
+  "bars": "data_live/nas100_m15.parquet",
+  "days": 355,
+  "first": "2025-09-21 22:00:00+00:00",
+  "last": "2026-11-08 23:00:00+00:00",
+  "risk_pct": 0.005,
+  "account": 24592.71,
+  "cost_points": 1.7,
+  "best": {
+    "range_bars": 2.0,
+    "target_r": 1.0,
+    "trades": 286.0,
+    "trade_days": 286.0,
+    "all_days": 355.0,
+    "win_rate": 0.5314685314685315,
+    "avg_r": 0.032545744229349645,
+    "total_pnl": 1144.554910880193,
+    "mean_per_all_day": 3.2240983405075867,
+    "mean_per_trade_day": 4.0019402478328425,
+    "median_per_trade_day": 12.527481711657696,
+    "t_trade_day": 0.6628533091198375,
+    "max_dd": 2344.4809432630723
+  },
+  "max_positive_t": 0.8083370625057256,
+  "p_adjusted": 0.504247876061969,
+  "target_50_per_day": false,
+  "required_risk_note": "mean_per_all_day is at 0.5% risk per trade; scaling risk scales PnL and drawdown"
+}

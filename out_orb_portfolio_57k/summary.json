@@ -1,0 +1,79 @@
+{
+  "account": 57000.0,
+  "scale_from_24592_71": 2.3177600191276198,
+  "risk_pct_per_trade_per_instrument": 0.005,
+  "instruments": ["USTECm/NAS100", "US30m/DowJones30"],
+  "strategy": "opening-range breakout M15, range=1 bar (09:30-09:45 NY), target=3R, stop=opposite range, exit 16:00 NY",
+  "scenarios": {
+    "base_costs": {
+      "cost_points": {"USTECm": 1.7, "US30m": 2.5},
+      "days": 2276,
+      "mean_per_day": 49.74,
+      "median_per_day": -158.44,
+      "total_pnl": 113197.77,
+      "max_drawdown": 14163.96,
+      "max_drawdown_pct": 24.8,
+      "win_day_rate": 0.434,
+      "is_2017_2021": {
+        "days": 1318,
+        "mean_per_day": 58.92,
+        "total_pnl": 77654.65,
+        "max_drawdown": 14163.96
+      },
+      "oos_2022_2025": {
+        "days": 958,
+        "mean_per_day": 37.1,
+        "total_pnl": 35543.13,
+        "max_drawdown": 10755.63
+      }
+    },
+    "conservative_costs": {
+      "cost_points": {"USTECm": 2.5, "US30m": 4.0},
+      "days": 2276,
+      "mean_per_day": 36.14,
+      "median_per_day": -172.34,
+      "total_pnl": 82255.05,
+      "max_drawdown": 17715.79,
+      "max_drawdown_pct": 31.1,
+      "win_day_rate": 0.427,
+      "is_2017_2021": {
+        "days": 1318,
+        "mean_per_day": 41.45,
+        "total_pnl": 54624.87,
+        "max_drawdown": 17715.79
+      },
+      "oos_2022_2025": {
+        "days": 958,
+        "mean_per_day": 28.84,
+        "total_pnl": 27630.18,
+        "max_drawdown": 12239.22
+      }
+    }
+  },
+  "required_capital_for_50_per_day": {
+    "base_costs": 57297.95,
+    "conservative_costs": 78859.99
+  },
+  "recent_validation": {
+    "period": "2025-09-21 to 2026-11-08",
+    "USTECm_best_9y_variant_range1_target3": {
+      "trades": 269,
+      "total_pnl": -1072.596,
+      "mean_per_day": -3.0214,
+      "max_drawdown": 4057.34
+    },
+    "USTECm_best_recent_range2_target4": {
+      "mean_per_day": 1.45,
+      "p_adjusted": 0.6222
+    },
+    "US30m_best_recent_range2_target3": {
+      "mean_per_day": 4.07,
+      "p_adjusted": 0.4173
+    },
+    "US500m_best_recent_range1_target4": {
+      "mean_per_day": 7.74,
+      "p_adjusted": 0.3263
+    }
+  },
+  "status": "research only, demo forward required, no real orders authorized"
+}

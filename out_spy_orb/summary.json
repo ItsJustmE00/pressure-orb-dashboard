@@ -1,0 +1,28 @@
+{
+  "bars": "data_live\\spy_m15_utc.parquet",
+  "days": 3347,
+  "first": "2008-01-22 12:30:00+00:00",
+  "last": "2021-05-06 17:45:00+00:00",
+  "risk_pct": 0.005,
+  "account": 24592.71,
+  "cost_points": 0.02,
+  "best": {
+    "range_bars": 1.0,
+    "target_r": 4.0,
+    "trades": 3058.0,
+    "trade_days": 3058.0,
+    "all_days": 3347.0,
+    "win_rate": 0.3168737737083061,
+    "avg_r": 0.04768963823897727,
+    "total_pnl": 16603.27223982609,
+    "mean_per_all_day": 4.960643035502267,
+    "mean_per_trade_day": 5.429454623880343,
+    "median_per_trade_day": -127.51775555555538,
+    "t_trade_day": 1.4018641434226753,
+    "max_dd": 16909.869645490973
+  },
+  "max_positive_t": 1.4440090844697802,
+  "p_adjusted": 0.20089955022488756,
+  "target_50_per_day": false,
+  "required_risk_note": "mean_per_all_day is at 0.5% risk per trade; scaling risk scales PnL and drawdown"
+}
