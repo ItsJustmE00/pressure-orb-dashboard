@@ -293,7 +293,7 @@ if ($Status) {
     "tunnel_ok=$healthy"
     "vercel_ok=$vercel"
     "quick_tunnel_processes=$(@($quick).Count)"
-    if ($state) { "candidate=$($state.candidate) candidate_pid=$($state.candidate_pid)" }
+    if ($state -and $state.candidate) { "candidate=$($state.candidate) candidate_pid=$($state.candidate_pid)" }
     exit 0
 }
 
