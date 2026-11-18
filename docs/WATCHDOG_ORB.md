@@ -9,8 +9,8 @@ Surveille la chaine live et relance automatiquement les composants critiques.
   relance MT5 avec `PRESSURE_start.ini` (EA `ORB_Pressure` sur USTECm M15).
 - Si le backend Flask ne repond plus sur le port `8050` : le relance en arriere-plan
   (logs dans `logs/backend.out.log` et `logs/backend.err.log`).
-- Si `cloudflared` est absent : ecrit un avertissement (le renouvellement du tunnel
-  est assure par **ORB Tunnel Keeper**, voir plus bas).
+- Si `cloudflared` est absent : declenche immediatement **ORB Tunnel Keeper**
+  (au lieu d'attendre la prochaine execution planifiee, voir plus bas).
 - Si le terminal tourne mais que l'EA n'est pas charge : avertissement dans le log.
 
 Hors session NY, MT5 n'est pas relance automatiquement.
@@ -31,6 +31,10 @@ planifiee **ORB Tunnel Keeper** execute `tools/quick_tunnel.ps1 -Check` toutes l
 
 Le candidat et son PID sont conserves dans `logs/quick_tunnel_state.json` : si une
 bascule est interrompue, la verification suivante reprend la finalisation.
+
+Si le watchdog detecte `cloudflared` absent entre deux executions, il declenche
+immediatement la tache **ORB Tunnel Keeper** : la coupure dure generalement
+1 a 3 minutes au lieu de 5.
 
 ## Commandes utiles
 

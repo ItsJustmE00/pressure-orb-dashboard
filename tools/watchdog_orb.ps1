@@ -133,9 +133,10 @@ function Invoke-Watchdog {
     $tunnelFlag = Join-Path $logDir 'tunnel_missing.flag'
     if (-not $tunnel) {
         if (-not (Test-Path $tunnelFlag)) {
-            Write-WatchdogLog 'ATTENTION tunnel cloudflared absent -> URL Vercel a recreer manuellement'
+            Write-WatchdogLog 'Tunnel cloudflared absent -> declenchement ORB Tunnel Keeper'
             New-Item -ItemType File -Path $tunnelFlag -Force | Out-Null
         }
+        Start-ScheduledTask -TaskName 'ORB Tunnel Keeper' -ErrorAction SilentlyContinue
     }
     else {
         Remove-Item $tunnelFlag -Force -ErrorAction SilentlyContinue
