@@ -7,13 +7,34 @@ Surveille la chaine live et relance automatiquement les composants critiques.
 - Toutes les minutes, via la tache planifiee **ORB Watchdog**.
 - Si `terminal64.exe` est absent **pendant la session NY (09:30-23:00, lundi-vendredi)** :
   relance MT5 avec `PRESSURE_start.ini` (EA `ORB_Pressure` sur USTECm M15).
-- Si le backend Flask ne repond plus sur le port `8050` : le relance en arriere-plan
+- Si aucun processus n'ecoute reellement sur le port `8050`, ou si `/api/health`
+  ne repond pas : supprime les backends zombies puis relance Flask en arriere-plan
   (logs dans `logs/backend.out.log` et `logs/backend.err.log`).
 - Si `cloudflared` est absent : declenche immediatement **ORB Tunnel Keeper**
   (au lieu d'attendre la prochaine execution planifiee, voir plus bas).
 - Si le terminal tourne mais que l'EA n'est pas charge : avertissement dans le log.
+- Detecte les trous de surveillance (veille/reveil) et active `StartWhenAvailable`
+  sur les deux taches planifiees. Aucun reveil de la machine n'est programme.
 
 Hors session NY, MT5 n'est pas relance automatiquement.
+
+## Calculs live
+
+- Le range ORB est uniquement la bougie **M15 de 09:30 NY**, exploitable apres
+  sa cloture a **09:45 NY**. Avant 09:45, le dashboard affiche « en formation »
+  et l'EA n'ouvre aucune position.
+- La pression acheteur/vendeur est calculee sur les **N dernieres bougies M15
+  cloturees** (`InpMinPressureBars`, 3 par defaut). Si la derniere bougie est deja
+  cloturee (pause CME, reprise), elle est utilisee au lieu d'etre ignoree.
+- Les dojis sont neutres : ils ne sont pas comptes dans le denominateur et ne
+  tirent pas artificiellement la pression vers 0,5.
+- L'EA et le backend appliquent la meme formule et le meme ordre de bougies.
+  La pression affichee doit donc etre recalculable exactement depuis les bougies
+  renvoyees par `/api/live`.
+- Le sizing utilise l'equity courante, `SYMBOL_TRADE_TICK_VALUE_LOSS`, des SL/TP
+  normalises au tick et refuse une entree si le lot minimum depasse le risque cible.
+- La pause quotidienne CME de **17:00 a 18:00 NY** est affichee comme
+  `feed_state=paused`, pas comme un flux figé.
 
 ## Renouvellement du quick tunnel
 
@@ -67,8 +88,11 @@ Get-ScheduledTaskInfo -TaskName 'ORB Tunnel Keeper'
   `terminal64.exe` est deja present.
 - L'EA restaure le range 09:30 NY et le nombre de trades du jour depuis l'historique
   apres un redemarrage, donc une relance ne bloque plus la journee.
-- La detection de l'EA lit les trois derniers journaux du terminal (et les lignes
-  `removed`), donc le passage a minuit ne declenche plus de fausse alerte.
+- La detection de l'EA lit les sept derniers journaux du terminal, les lignes
+  `removed` et le demarrage du terminal, donc le passage a minuit ne declenche
+  plus de fausse alerte.
+- Le watchdog ne lance jamais une deuxieme instance de MT5 : il verifie d'abord
+  `terminal64.exe` et ne demarre qu'une seule instance avec `PRESSURE_start.ini`.
 - Ne pas lancer `cloudflared` manuellement : passer par `tools/quick_tunnel.ps1`
   pour que `dashboard/config.js` et Vercel restent synchronises.
 - Le renouvellement peut prendre 1 a 2 minutes (creation du tunnel + propagation DNS

@@ -23,6 +23,7 @@ PRESET = DATA_PATH / "MQL5" / "Presets" / "PRESSURE.set"
 SYMBOL = "USTECm"
 MAGIC = 20261117
 NY = ZoneInfo("America/New_York")
+MOROCCO = ZoneInfo("Africa/Casablanca")
 UTC = timezone.utc
 
 _LOCK = threading.RLock()
@@ -167,7 +168,13 @@ def _latest_logs():
         ],
         key=lambda item: item.name,
     )
-    return (mql[0] if mql else None, term[-3:])
+    # Seven days covers a terminal started long before the current session.
+    return (mql[0] if mql else None, term[-7:])
+
+
+def _read_logs():
+    mql_log, _ = _latest_logs()
+    return _tail(mql_log, 600)
 
 
 def _read_config():
@@ -197,51 +204,102 @@ def _read_config():
     return values
 
 
-def _market(symbol_tick):
+def _cfg_int(config, key, default):
+    try:
+        return int(config.get(key, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _next_session_label(now_ny, hour, minute):
+    candidate = now_ny + timedelta(days=1)
+    while candidate.weekday() >= 5:
+        candidate += timedelta(days=1)
+    return f"{_WEEKDAYS[candidate.weekday()].capitalize()} {hour:02d}:{minute:02d} NY"
+
+
+def _market(symbol_tick, config=None):
+    config = config or {}
     now_ny = datetime.now(NY)
-    now_morocco = datetime.now(timezone(timedelta(hours=1)))  # GMT+1 (Maroc)
+    now_morocco = datetime.now(MOROCCO)
     weekday = now_ny.weekday()
-    clock = now_ny.time()
-    close_hour = 23  # Trade jusqu'à 23:00 NY
-    close_minute = 0
-    close_time = now_ny.replace(
+
+    range_hour = _cfg_int(config, "InpRangeHourNY", 9)
+    range_minute = _cfg_int(config, "InpRangeMinuteNY", 30)
+    close_hour = _cfg_int(config, "InpCloseHourNY", 23)
+    close_minute = _cfg_int(config, "InpCloseMinuteNY", 0)
+    close_buffer = _cfg_int(config, "InpCloseBufferMinutes", 5)
+    friday_buffer = _cfg_int(config, "InpFridayCloseBufferMinutes", 10)
+    server_offset = _cfg_int(config, "InpServerGMTOffsetHours", 0)
+
+    range_start_dt = now_ny.replace(
+        hour=range_hour, minute=range_minute, second=0, microsecond=0
+    )
+    range_end_dt = range_start_dt + timedelta(minutes=15)
+    close_dt = now_ny.replace(
         hour=close_hour, minute=close_minute, second=0, microsecond=0
-    ).time()
-    range_start = now_ny.replace(hour=9, minute=30, second=0, microsecond=0).time()
-    range_end = now_ny.replace(hour=9, minute=45, second=0, microsecond=0).time()
+    )
+    buffer = friday_buffer if weekday == 4 else close_buffer
+    safety_close_dt = close_dt - timedelta(minutes=buffer)
+
+    # CME equity-index maintenance break: 17:00-18:00 New York.
+    break_start = now_ny.replace(hour=17, minute=0, second=0, microsecond=0)
+    break_end = now_ny.replace(hour=18, minute=0, second=0, microsecond=0)
+    daily_break = weekday < 5 and break_start <= now_ny < break_end
 
     if weekday >= 5:
         status = "weekend"
         phase = "weekend"
         label = "Marché fermé"
-        next_event = "Lundi 09:30 NY"
-    elif clock < range_start:
+        next_event = _next_session_label(now_ny, range_hour, range_minute)
+    elif now_ny < range_start_dt:
         status = "pre_open"
         phase = "pre_range"
         label = "Avant l'ouverture"
-        next_event = "09:30 NY"
-    elif clock < range_end:
+        next_event = f"{range_hour:02d}:{range_minute:02d} NY"
+    elif now_ny < range_end_dt:
         status = "range"
         phase = "opening_range"
         label = "Opening range"
-        next_event = "09:45 NY"
-    elif clock < close_time:
+        next_event = f"{range_end_dt:%H:%M} NY"
+    elif now_ny < safety_close_dt:
         status = "open"
         phase = "entry_window"
         label = "Fenêtre d'entrée (toute la journée)"
-        next_event = f"{close_time.strftime('%H:%M')} NY"
+        next_event = f"{safety_close_dt:%H:%M} NY"
+    elif now_ny < close_dt:
+        status = "open"
+        phase = "close_buffer"
+        label = "Clôture de sécurité en cours"
+        next_event = f"{close_dt:%H:%M} NY"
     else:
         status = "closed"
         phase = "after_close"
         label = "Après clôture"
-        next_event = "Demain 09:30 NY"
+        next_event = _next_session_label(now_ny, range_hour, range_minute)
+
+    if daily_break and status == "open":
+        label = "Pause quotidienne 17:00-18:00 NY"
+        next_event = "18:00 NY"
 
     age = None
     tick_time = None
     if symbol_tick is not None and getattr(symbol_tick, "time", 0):
+        # MT5 timestamps are in server time. Convert them to UTC first.
         tick_dt = datetime.fromtimestamp(symbol_tick.time, tz=UTC)
+        if server_offset:
+            tick_dt -= timedelta(hours=server_offset)
         tick_time = tick_dt.astimezone(NY).isoformat()
         age = max(0, int((datetime.now(UTC) - tick_dt).total_seconds()))
+
+    if weekday >= 5 or status == "closed":
+        feed_state = "closed"
+    elif daily_break:
+        feed_state = "paused"
+    elif age is not None and age > 120:
+        feed_state = "stale"
+    else:
+        feed_state = "live"
 
     return {
         "ny_time": now_ny.isoformat(),
@@ -257,7 +315,15 @@ def _market(symbol_tick):
         "next_event": next_event,
         "tick_time": tick_time,
         "tick_age_sec": age,
+        "tick_stale": feed_state == "stale",
+        "feed_state": feed_state,
         "is_weekend": weekday >= 5,
+        "daily_break": daily_break,
+        "range_start": f"{range_hour:02d}:{range_minute:02d}",
+        "range_end": f"{range_end_dt:%H:%M}",
+        "close_at": f"{close_dt:%H:%M}",
+        "safety_close_at": f"{safety_close_dt:%H:%M}",
+        "server_gmt_offset_hours": server_offset,
     }
 
 
@@ -272,16 +338,33 @@ def _ea_state(term_lines, config):
         r"expert (ORB_Pressure|ORB_Portfolio) .* removed",
         re.IGNORECASE,
     )
+    start_pattern = re.compile(
+        r"MetaTrader 5 x64 build .* started",
+        re.IGNORECASE,
+    )
+    last_start = -1
     last_load = -1
     last_remove = -1
     last = None
     for index, line in enumerate(term_lines):
+        if start_pattern.search(line):
+            last_start = index
         if load_pattern.search(line):
             last_load = index
             last = line
         elif remove_pattern.search(line):
             last_remove = index
-    loaded = last_load >= 0 and last_load > last_remove
+
+    # A load is valid only if it happened after the last terminal start and
+    # after the last removal. If the start line is older than the scanned
+    # window (terminal up for days), a later load still proves the EA is here.
+    if last_remove > last_load:
+        loaded = False
+    elif last_start >= 0:
+        loaded = last_load > last_start
+    else:
+        loaded = last_load >= 0
+
     name = None
     if loaded and last:
         found = re.search(r"(ORB_Pressure|ORB_Portfolio)", last, re.IGNORECASE)
@@ -297,117 +380,231 @@ def _ea_state(term_lines, config):
     }
 
 
-def _calculate_pressure(bars_count=3):
-    """Calculate buy/sell pressure from recent M15 candles"""
+def _calculate_pressure(bars_count=3, server_offset=0):
+    """Calculate buy/sell pressure from the last N closed M15 candles.
+
+    The formula is identical to the EA: doji bars are neutral and excluded
+    from the denominator, so they cannot drag the reading toward 0.5. The
+    latest bar is used when it is already closed (e.g. after the CME break).
+    """
+    bars_count = max(1, int(bars_count))
     try:
-        rates = mt5.copy_rates_from_pos(SYMBOL, mt5.TIMEFRAME_M15, 0, bars_count + 1)
+        rates = mt5.copy_rates_from_pos(SYMBOL, mt5.TIMEFRAME_M15, 0, bars_count + 2)
         if rates is None or len(rates) < bars_count + 1:
             return {
-                "buy_pressure": 0.0,
-                "sell_pressure": 0.0,
+                "buy_pressure": 0.5,
+                "sell_pressure": 0.5,
                 "bullish_count": 0,
                 "bearish_count": 0,
+                "neutral_count": 0,
                 "body_avg": 0.0,
-                "candles": []
+                "bars_count": bars_count,
+                "candles": [],
             }
-        
+
+        now_server = datetime.now(UTC) + timedelta(hours=server_offset)
+        last_bar_server = datetime.fromtimestamp(int(rates[-1][0]), tz=UTC)
+        latest_closed = last_bar_server + timedelta(minutes=15) <= now_server
+        if latest_closed:
+            selected = list(rates[-bars_count:])
+        else:
+            selected = list(rates[-(bars_count + 1):-1])
+        if len(selected) < bars_count:
+            raise ValueError("pas assez de bougies M15 cloturees")
+
         buy_pressure = 0.0
         sell_pressure = 0.0
         bullish_count = 0
         bearish_count = 0
+        neutral_count = 0
         total_body = 0.0
         candles_data = []
-        
-        for i in range(1, bars_count + 1):
-            rate = rates[i]
-            open_p = rate[1]
-            high = rate[2]
-            low = rate[3]
-            close = rate[4]
-            
+
+        # Newest first, matching the EA series order and the dashboard labels.
+        for rate in reversed(selected):
+            open_p = float(rate[1])
+            high = float(rate[2])
+            low = float(rate[3])
+            close = float(rate[4])
+            bar_server = datetime.fromtimestamp(int(rate[0]), tz=UTC)
+            bar_utc = bar_server - timedelta(hours=server_offset)
+
             body = abs(close - open_p)
             range_p = high - low
-            
             if range_p <= 0:
                 continue
-            
+
             upper_wick = high - max(open_p, close)
             lower_wick = min(open_p, close) - low
-            
-            if close > open_p:
+
+            if body <= 0:
+                neutral_count += 1
+            elif close > open_p:
                 buy_pressure += (body / range_p) * (1 - upper_wick / range_p)
+                sell_pressure -= (body / range_p) * (1 - upper_wick / range_p)
                 bullish_count += 1
+                total_body += body
             else:
+                sell_pressure += (body / range_p) * (1 - lower_wick / range_p)
                 buy_pressure -= (body / range_p) * (1 - lower_wick / range_p)
                 bearish_count += 1
-            
-            if close < open_p:
-                sell_pressure += (body / range_p) * (1 - lower_wick / range_p)
-            else:
-                sell_pressure -= (body / range_p) * (1 - upper_wick / range_p)
-            
-            total_body += body
-            candles_data.append({
-                "open": open_p,
-                "high": high,
-                "low": low,
-                "close": close,
-                "body": body,
-                "range": range_p,
-                "upper_wick": upper_wick,
-                "lower_wick": lower_wick
-            })
-        
+                total_body += body
+
+            candles_data.append(
+                {
+                    "time": bar_utc.isoformat(),
+                    "time_ny": bar_utc.astimezone(NY).isoformat(),
+                    "open": open_p,
+                    "high": high,
+                    "low": low,
+                    "close": close,
+                    "body": body,
+                    "range": range_p,
+                    "upper_wick": upper_wick,
+                    "lower_wick": lower_wick,
+                    "neutral": body <= 0,
+                }
+            )
+
         total_bars = bullish_count + bearish_count
         if total_bars > 0:
             buy_pressure = (buy_pressure / total_bars + 1) / 2
             sell_pressure = (sell_pressure / total_bars + 1) / 2
             body_avg = total_body / total_bars
         else:
-            buy_pressure = 0.0
-            sell_pressure = 0.0
+            buy_pressure = 0.5
+            sell_pressure = 0.5
             body_avg = 0.0
-        
+
         return {
-            "buy_pressure": max(0, min(1, buy_pressure)),
-            "sell_pressure": max(0, min(1, sell_pressure)),
+            "buy_pressure": max(0.0, min(1.0, buy_pressure)),
+            "sell_pressure": max(0.0, min(1.0, sell_pressure)),
             "bullish_count": bullish_count,
             "bearish_count": bearish_count,
+            "neutral_count": neutral_count,
             "body_avg": body_avg,
-            "candles": candles_data
+            "bars_count": bars_count,
+            "candles": candles_data,
         }
-    except Exception as e:
+    except Exception:
         return {
             "buy_pressure": 0.0,
             "sell_pressure": 0.0,
             "bullish_count": 0,
             "bearish_count": 0,
+            "neutral_count": 0,
             "body_avg": 0.0,
-            "candles": []
+            "bars_count": bars_count,
+            "candles": [],
         }
 
 
-def _calculate_opening_range():
-    """High/low de la bougie M15 de 09:30 NY, reference du range ORB de l'EA."""
+def _opening_range_state(config, now_ny=None):
+    """Return the 09:30 NY M15 range and whether that bar is closed.
+
+    Before 09:45 the bar is still forming; its high/low is exposed for display
+    only and must never be used as a trading range.
+    """
+    config = config or {}
+    now_ny = now_ny or datetime.now(NY)
+    server_offset = _cfg_int(config, "InpServerGMTOffsetHours", 0)
+    range_hour = _cfg_int(config, "InpRangeHourNY", 9)
+    range_minute = _cfg_int(config, "InpRangeMinuteNY", 30)
+    start_ny = now_ny.replace(
+        hour=range_hour, minute=range_minute, second=0, microsecond=0
+    )
+    end_ny = start_ny + timedelta(minutes=15)
+
+    state = {
+        "high": None,
+        "low": None,
+        "complete": False,
+        "status": "pending",
+        "bar_time": None,
+        "source": None,
+        "range_start": start_ny.isoformat(),
+        "range_end": end_ny.isoformat(),
+    }
+
+    if now_ny.weekday() >= 5:
+        state["status"] = "weekend"
+        return state
+    if now_ny < start_ny:
+        return state
+
+    rates = None
     try:
-        rates = mt5.copy_rates_from_pos(SYMBOL, mt5.TIMEFRAME_M15, 0, 300)
-        if rates is None:
-            return None, None
-        today_ny = datetime.now(NY).date()
-        for rate in reversed(rates):
-            bar_ny = datetime.fromtimestamp(int(rate[0]), UTC).astimezone(NY)
-            if (
-                bar_ny.date() == today_ny
-                and bar_ny.hour == 9
-                and bar_ny.minute == 30
-            ):
-                return float(rate[2]), float(rate[3])
+        rates = mt5.copy_rates_from_pos(SYMBOL, mt5.TIMEFRAME_M15, 0, 400)
     except Exception:
-        pass
-    return None, None
+        rates = None
+
+    if rates is not None:
+        for rate in rates:
+            bar_server = datetime.fromtimestamp(int(rate[0]), tz=UTC)
+            bar_utc = bar_server - timedelta(hours=server_offset)
+            bar_ny = bar_utc.astimezone(NY)
+            if bar_ny.replace(second=0, microsecond=0) != start_ny:
+                continue
+            state["high"] = float(rate[2])
+            state["low"] = float(rate[3])
+            state["bar_time"] = bar_utc.isoformat()
+            state["source"] = "m15"
+            state["complete"] = now_ny >= end_ny
+            state["status"] = "complete" if state["complete"] else "forming"
+            return state
+
+    if now_ny < end_ny:
+        state["status"] = "forming"
+        return state
+
+    # Fallback: read the range logged by the EA when M15 history is missing.
+    mql_log, _ = _latest_logs()
+    if mql_log is not None:
+        try:
+            log_age = time.time() - mql_log.stat().st_mtime
+        except OSError:
+            log_age = 10**9
+        today_server = datetime.now(UTC).strftime("%Y%m%d") + ".log"
+        date_tag = f"{start_ny.year:04d}.{start_ny.month:02d}.{start_ny.day:02d}"
+        if log_age <= 36 * 3600:
+            fixed_re = re.compile(
+                r"PRESSURE range (?:fixed|restored):\s*high=([0-9.]+)\s+"
+                r"low=([0-9.]+)(?:\s+bar=(\d{4}\.\d{2}\.\d{2}))?",
+                re.IGNORECASE,
+            )
+            signal_re = re.compile(
+                r"PRESSURE range high=([0-9.]+)\s+low=([0-9.]+)",
+                re.IGNORECASE,
+            )
+            for line in reversed(_tail(mql_log, 600)):
+                match = fixed_re.search(line)
+                if match:
+                    tag = match.group(3)
+                    if tag is None or tag == date_tag:
+                        state["high"] = float(match.group(1))
+                        state["low"] = float(match.group(2))
+                        state["complete"] = True
+                        state["status"] = "complete"
+                        state["bar_time"] = start_ny.isoformat()
+                        state["source"] = "ea_log"
+                        return state
+                match = signal_re.search(line)
+                if match and mql_log.name == today_server:
+                    state["high"] = float(match.group(1))
+                    state["low"] = float(match.group(2))
+                    state["complete"] = True
+                    state["status"] = "complete"
+                    state["bar_time"] = start_ny.isoformat()
+                    state["source"] = "ea_log"
+                    return state
+
+    state["status"] = "unavailable"
+    return state
 
 
 def _live_read():
+    config = _read_config()
+    server_offset = _cfg_int(config, "InpServerGMTOffsetHours", 0)
     account = mt5.account_info()
     terminal = mt5.terminal_info()
     if account is None or terminal is None:
@@ -429,26 +626,21 @@ def _live_read():
         row["side"] = "BUY" if row.get("type") == 0 else "SELL"
         positions.append(row)
     
-    # Calculate pressure from candles
-    pressure = _calculate_pressure(bars_count=3)
-    
-    # Range ORB depuis la bougie M15 09:30 NY, fallback sur les logs EA
-    range_high, range_low = _calculate_opening_range()
-    if range_high is None:
-        try:
-            logs = _read_logs()
-            for line in reversed(logs):
-                if "PRESSURE range high=" in line:
-                    match = re.search(r"high=([\d.]+)\s+low=([\d.]+)", line)
-                    if match:
-                        range_high = float(match.group(1))
-                        range_low = float(match.group(2))
-                        break
-        except Exception:
-            pass
-    
-    pressure["range_high"] = range_high
-    pressure["range_low"] = range_low
+    # Calculate pressure from the last N closed M15 candles (preset-driven).
+    pressure = _calculate_pressure(
+        bars_count=_cfg_int(config, "InpMinPressureBars", 3),
+        server_offset=server_offset,
+    )
+
+    # The ORB range is the completed 09:30 NY M15 bar. Before 09:45 the same
+    # bar is exposed as "forming" for display only.
+    range_state = _opening_range_state(config)
+    pressure["range_high"] = range_state["high"]
+    pressure["range_low"] = range_state["low"]
+    pressure["range_complete"] = range_state["complete"]
+    pressure["range_status"] = range_state["status"]
+    pressure["range_bar_time"] = range_state["bar_time"]
+    pressure["range_source"] = range_state["source"]
 
     orders = []
     for item in orders_raw:
@@ -466,7 +658,10 @@ def _live_read():
         deal_time = row.get("time")
         if not deal_time:
             continue
-        deal_ny = datetime.fromtimestamp(deal_time, tz=UTC).astimezone(NY)
+        deal_utc = datetime.fromtimestamp(deal_time, tz=UTC) - timedelta(
+            hours=server_offset
+        )
+        deal_ny = deal_utc.astimezone(NY)
         if deal_ny.date() != today_ny:
             continue
         row["time_ny"] = deal_ny.isoformat()
@@ -479,34 +674,43 @@ def _live_read():
         }.get(row.get("entry"), str(row.get("entry")))
         today_deals.append(row)
 
+    # The EA counts DEAL_ENTRY_IN deals; mirror that exactly for the day cap.
+    entries = sum(1 for row in today_deals if row.get("entry") == 0)
+
+    # Aggregate exits by position so partial closes count as one trade.
+    exit_groups = {}
+    for row in today_deals:
+        if row.get("entry") not in (1, 2, 3):
+            continue
+        key = row.get("position_id") or row.get("ticket")
+        value = (
+            float(row.get("profit") or 0)
+            + float(row.get("swap") or 0)
+            + float(row.get("commission") or 0)
+        )
+        exit_groups[key] = exit_groups.get(key, 0.0) + value
+
+    wins = sum(1 for value in exit_groups.values() if value > 0)
+    losses = sum(1 for value in exit_groups.values() if value < 0)
     realized = round(
         sum(
             float(row.get("profit") or 0)
             + float(row.get("swap") or 0)
             + float(row.get("commission") or 0)
             for row in today_deals
-            if row.get("entry") in (1, 2, 3)
         ),
         2,
     )
-    wins = sum(
-        1
-        for row in today_deals
-        if row.get("entry") in (1, 2, 3)
-        and (float(row.get("profit") or 0) > 0)
+    realized_closed = round(sum(exit_groups.values()), 2)
+    commission_today = round(
+        sum(float(row.get("commission") or 0) for row in today_deals), 2
     )
-    losses = sum(
-        1
-        for row in today_deals
-        if row.get("entry") in (1, 2, 3)
-        and (float(row.get("profit") or 0) < 0)
-    )
+    swap_today = round(sum(float(row.get("swap") or 0) for row in today_deals), 2)
 
     spread = None
     if symbol_tick is not None:
         spread = round(float(symbol_tick.ask) - float(symbol_tick.bid), 4)
 
-    config = _read_config()
     mql_log, term_logs = _latest_logs()
     mql_lines = _tail(mql_log, 80)
     term_lines = []
@@ -565,9 +769,13 @@ def _live_read():
             "point": symbol_info.point if symbol_info else None,
             "digits": symbol_info.digits if symbol_info else None,
             "trade_mode": symbol_info.trade_mode if symbol_info else None,
-            "time": _epoch_to_iso(symbol_tick.time) if symbol_tick else None,
+            "time": (
+                _epoch_to_iso(symbol_tick.time - server_offset * 3600)
+                if symbol_tick
+                else None
+            ),
         },
-        "market": _market(symbol_tick),
+        "market": _market(symbol_tick, config),
         "ea": _ea_state(term_lines, config),
         "config": config,
         "positions": positions,
@@ -575,9 +783,14 @@ def _live_read():
         "today": {
             "deals": today_deals,
             "realized": realized,
+            "realized_closed": realized_closed,
+            "commission": commission_today,
+            "swap": swap_today,
             "wins": wins,
             "losses": losses,
-            "count": wins + losses,
+            "entries": entries,
+            "closed": wins + losses,
+            "count": entries,
         },
         "pressure": pressure,
         "logs": logs[-80:],
@@ -595,22 +808,44 @@ def live_snapshot(force=False):
             return _LAST_SNAPSHOT
     data = _call(_live_read)
     if data is None:
+        config = _read_config()
         return {
             "ok": False,
             "generated_at": datetime.now(UTC).isoformat(),
             "error": _LAST_ERROR or "MT5 indisponible",
             "terminal_running": bool(_terminal_processes()),
             "processes": _terminal_processes(),
-            "market": _market(None),
-            "config": _read_config(),
+            "market": _market(None, config),
+            "config": config,
+            "ea": _ea_state([], config),
             "positions": [],
             "orders": [],
+            "today": {
+                "deals": [],
+                "realized": 0,
+                "realized_closed": 0,
+                "commission": 0,
+                "swap": 0,
+                "wins": 0,
+                "losses": 0,
+                "entries": 0,
+                "closed": 0,
+                "count": 0,
+            },
             "pressure": {
                 "buy_pressure": 0.0,
                 "sell_pressure": 0.0,
                 "bullish_count": 0,
                 "bearish_count": 0,
+                "neutral_count": 0,
                 "body_avg": 0.0,
+                "bars_count": _cfg_int(config, "InpMinPressureBars", 3),
+                "range_high": None,
+                "range_low": None,
+                "range_complete": False,
+                "range_status": "unavailable",
+                "range_bar_time": None,
+                "range_source": None,
                 "candles": []
             },
             "logs": [],

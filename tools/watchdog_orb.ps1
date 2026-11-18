@@ -9,6 +9,7 @@ New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $terminal = 'C:\Program Files\MetaTrader 5\terminal64.exe'
 $data = 'C:\Users\moham\AppData\Roaming\MetaQuotes\Terminal\D0E8209F77C8CF37AD8BF550E51FF075'
 $startIni = Join-Path $data 'PRESSURE_start.ini'
+$preset = Join-Path $data 'MQL5\Presets\PRESSURE.set'
 $python = 'C:\Python314\python.exe'
 
 function Write-WatchdogLog {
@@ -27,13 +28,33 @@ function Get-NYNow {
     return [System.TimeZoneInfo]::ConvertTimeFromUtc((Get-Date).ToUniversalTime(), $tz)
 }
 
+function Get-PresetValue {
+    param([string]$Key, $Default)
+    if (-not (Test-Path $preset)) {
+        return $Default
+    }
+    $line = Get-Content $preset -Encoding Unicode -ErrorAction SilentlyContinue |
+        Where-Object { $_ -match ('^\s*' + [regex]::Escape($Key) + '\s*=') } |
+        Select-Object -First 1
+    if (-not $line) {
+        return $Default
+    }
+    return ($line -split '=', 2)[1].Trim()
+}
+
 function Test-MarketHours {
     $ny = Get-NYNow
     if ($ny.DayOfWeek -eq [DayOfWeek]::Saturday -or $ny.DayOfWeek -eq [DayOfWeek]::Sunday) {
         return $false
     }
+    $rangeHour = [int](Get-PresetValue 'InpRangeHourNY' 9)
+    $rangeMinute = [int](Get-PresetValue 'InpRangeMinuteNY' 30)
+    $closeHour = [int](Get-PresetValue 'InpCloseHourNY' 23)
+    $closeMinute = [int](Get-PresetValue 'InpCloseMinuteNY' 0)
     $minutes = $ny.Hour * 60 + $ny.Minute
-    return ($minutes -ge 570 -and $minutes -lt 1380)   # 09:30 -> 23:00 NY
+    $start = $rangeHour * 60 + $rangeMinute
+    $end = $closeHour * 60 + $closeMinute
+    return ($minutes -ge $start -and $minutes -lt $end)
 }
 
 function Test-Terminal {
@@ -55,15 +76,31 @@ function Start-Terminal {
 }
 
 function Test-Backend {
-    if (Get-NetTCPConnection -LocalPort 8050 -State Listen -ErrorAction SilentlyContinue) {
-        return $true
+    # Liveness = the Flask process actually listens on 8050.
+    $listener = Get-NetTCPConnection -LocalPort 8050 -State Listen -ErrorAction SilentlyContinue
+    return [bool]$listener
+}
+
+function Test-BackendHealth {
+    try {
+        $response = Invoke-WebRequest -Uri 'http://127.0.0.1:8050/api/health' `
+            -UseBasicParsing -TimeoutSec 8 -ErrorAction Stop
+        return ($response.StatusCode -eq 200)
     }
-    $proc = Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -match 'web[\\/]app\.py' }
-    return [bool]$proc
+    catch {
+        return $false
+    }
 }
 
 function Start-Backend {
+    # Remove a hung/duplicate backend before starting a fresh one.
+    $stale = Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -match 'web[\\/]app\.py' }
+    foreach ($proc in $stale) {
+        Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
+        Write-WatchdogLog "Backend zombie arrete (PID $($proc.ProcessId))"
+    }
+
     $out = Join-Path $logDir 'backend.out.log'
     $err = Join-Path $logDir 'backend.err.log'
     Start-Process -FilePath $python -ArgumentList 'web\app.py','--port','8050' `
@@ -73,17 +110,17 @@ function Start-Backend {
 }
 
 function Test-EALoaded {
-    $logDir = Join-Path $data 'logs'
-    $files = Get-ChildItem $logDir -Filter '*.log' -ErrorAction SilentlyContinue |
+    $logDirTerminal = Join-Path $data 'logs'
+    $files = Get-ChildItem $logDirTerminal -Filter '*.log' -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -match '^\d{8}\.log$' } |
         Sort-Object Name |
-        Select-Object -Last 3
+        Select-Object -Last 7
     if (-not $files) {
         return $false
     }
     $lines = @()
     foreach ($file in $files) {
-        $lines += Get-Content $file.FullName -Tail 1000 -ErrorAction SilentlyContinue
+        $lines += Get-Content $file.FullName -Tail 1200 -ErrorAction SilentlyContinue
     }
     $lastStart = -1
     $lastLoad = -1
@@ -93,10 +130,56 @@ function Test-EALoaded {
         if ($lines[$i] -match 'expert ORB_Pressure.*loaded successfully') { $lastLoad = $i }
         if ($lines[$i] -match 'expert ORB_Pressure.*removed') { $lastRemove = $i }
     }
-    return ($lastStart -ge 0 -and $lastLoad -gt $lastStart -and $lastLoad -gt $lastRemove)
+    if ($lastRemove -gt $lastLoad) {
+        return $false
+    }
+    if ($lastStart -ge 0) {
+        return ($lastLoad -gt $lastStart)
+    }
+    # Terminal started before the scanned window but a load was seen since.
+    return ($lastLoad -ge 0)
+}
+
+function Test-WatchdogGap {
+    $statePath = Join-Path $logDir 'watchdog_last_run.txt'
+    $now = (Get-Date).ToUniversalTime()
+    if (Test-Path $statePath) {
+        try {
+            $lastText = (Get-Content $statePath -Raw).Trim()
+            if ($lastText) {
+                $last = [datetime]::Parse($lastText).ToUniversalTime()
+                $gap = ($now - $last).TotalMinutes
+                if ($gap -gt 5) {
+                    Write-WatchdogLog ('ATTENTION trou de surveillance de {0:N0} min (veille/reveil ?)' -f $gap)
+                }
+            }
+        }
+        catch {
+        }
+    }
+    Set-Content -Path $statePath -Value $now.ToString('o') -Encoding UTF8
+}
+
+function Enable-TaskStartWhenAvailable {
+    param([string]$Name)
+    try {
+        $task = Get-ScheduledTask -TaskName $Name -ErrorAction Stop
+        $settings = $task.Settings
+        if (-not $settings.StartWhenAvailable) {
+            $settings.StartWhenAvailable = $true
+            Set-ScheduledTask -TaskName $Name -Settings $settings | Out-Null
+            Write-WatchdogLog "Tache $Name : StartWhenAvailable active"
+        }
+    }
+    catch {
+    }
 }
 
 function Invoke-Watchdog {
+    Test-WatchdogGap
+    Enable-TaskStartWhenAvailable 'ORB Watchdog'
+    Enable-TaskStartWhenAvailable 'ORB Tunnel Keeper'
+
     $terminalWasRunning = Test-Terminal
 
     $offhoursFlag = Join-Path $logDir 'offhours_missing.flag'
@@ -123,9 +206,25 @@ function Invoke-Watchdog {
 
     if (-not (Test-Backend)) {
         Start-Backend
-        Start-Sleep -Seconds 6
+        Start-Sleep -Seconds 2
+        for ($i = 0; $i -lt 20; $i++) {
+            if (Test-Backend) { break }
+            Start-Sleep -Seconds 1
+        }
         if (-not (Test-Backend)) {
             Write-WatchdogLog 'ECHEC relance backend -> port 8050 toujours ferme'
+        }
+    }
+    else {
+        $healthFlag = Join-Path $logDir 'backend_health.flag'
+        if (-not (Test-BackendHealth)) {
+            if (-not (Test-Path $healthFlag)) {
+                Write-WatchdogLog 'ATTENTION backend port 8050 ouvert mais /api/health KO'
+                New-Item -ItemType File -Path $healthFlag -Force | Out-Null
+            }
+        }
+        else {
+            Remove-Item $healthFlag -Force -ErrorAction SilentlyContinue
         }
     }
 
@@ -144,6 +243,10 @@ function Invoke-Watchdog {
 
     if (Test-Terminal) {
         $eaFlag = Join-Path $logDir 'ea_missing.flag'
+        $eaBinary = Join-Path $data 'MQL5\Experts\ORB_Pressure.ex5'
+        if (-not (Test-Path $eaBinary)) {
+            Write-WatchdogLog "ERREUR binaire EA introuvable: $eaBinary"
+        }
         if (-not (Test-EALoaded)) {
             $proc = Get-Process terminal64 -ErrorAction SilentlyContinue | Select-Object -First 1
             $uptime = if ($proc) { ((Get-Date) - $proc.StartTime).TotalSeconds } else { 0 }
