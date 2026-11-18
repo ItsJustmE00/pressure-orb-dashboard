@@ -63,6 +63,8 @@ Get-ScheduledTaskInfo -TaskName 'ORB Tunnel Keeper'
   `terminal64.exe` est deja present.
 - L'EA restaure le range 09:30 NY et le nombre de trades du jour depuis l'historique
   apres un redemarrage, donc une relance ne bloque plus la journee.
+- La detection de l'EA lit les trois derniers journaux du terminal (et les lignes
+  `removed`), donc le passage a minuit ne declenche plus de fausse alerte.
 - Ne pas lancer `cloudflared` manuellement : passer par `tools/quick_tunnel.ps1`
   pour que `dashboard/config.js` et Vercel restent synchronises.
 - Le renouvellement peut prendre 1 a 2 minutes (creation du tunnel + propagation DNS

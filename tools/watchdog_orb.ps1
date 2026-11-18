@@ -73,11 +73,18 @@ function Start-Backend {
 }
 
 function Test-EALoaded {
-    $terminalLog = Join-Path $data ("logs\{0}.log" -f (Get-Date -Format 'yyyyMMdd'))
-    if (-not (Test-Path $terminalLog)) {
+    $logDir = Join-Path $data 'logs'
+    $files = Get-ChildItem $logDir -Filter '*.log' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^\d{8}\.log$' } |
+        Sort-Object Name |
+        Select-Object -Last 3
+    if (-not $files) {
         return $false
     }
-    $lines = Get-Content $terminalLog -Tail 1000 -ErrorAction SilentlyContinue
+    $lines = @()
+    foreach ($file in $files) {
+        $lines += Get-Content $file.FullName -Tail 1000 -ErrorAction SilentlyContinue
+    }
     $lastStart = -1
     $lastLoad = -1
     $lastRemove = -1

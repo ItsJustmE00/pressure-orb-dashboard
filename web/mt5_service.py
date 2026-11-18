@@ -165,10 +165,9 @@ def _latest_logs():
             for item in term_dir.glob("*.log")
             if re.fullmatch(r"\d{8}\.log", item.name)
         ],
-        key=lambda item: item.stat().st_mtime,
-        reverse=True,
+        key=lambda item: item.name,
     )
-    return (mql[0] if mql else None, term[0] if term else None)
+    return (mql[0] if mql else None, term[-3:])
 
 
 def _read_config():
@@ -263,22 +262,34 @@ def _market(symbol_tick):
 
 
 def _ea_state(term_lines, config):
-    pattern = re.compile(
+    load_pattern = re.compile(
         r"expert (ORB_Pressure|ORB_Portfolio) .* loaded successfully|"
         r"(ORB_Pressure|ORB_Portfolio) loaded|"
         r"inputs read from expert '(ORB_Pressure|ORB_Portfolio)'",
         re.IGNORECASE,
     )
-    matches = [line for line in term_lines if pattern.search(line)]
-    last = matches[-1] if matches else None
+    remove_pattern = re.compile(
+        r"expert (ORB_Pressure|ORB_Portfolio) .* removed",
+        re.IGNORECASE,
+    )
+    last_load = -1
+    last_remove = -1
+    last = None
+    for index, line in enumerate(term_lines):
+        if load_pattern.search(line):
+            last_load = index
+            last = line
+        elif remove_pattern.search(line):
+            last_remove = index
+    loaded = last_load >= 0 and last_load > last_remove
     name = None
-    if last:
+    if loaded and last:
         found = re.search(r"(ORB_Pressure|ORB_Portfolio)", last, re.IGNORECASE)
         name = found.group(1) if found else None
     return {
-        "loaded": bool(last),
+        "loaded": loaded,
         "name": name,
-        "last_line": last,
+        "last_line": last if loaded else None,
         "preset": str(PRESET),
         "preset_exists": PRESET.exists(),
         "risk_pct": config.get("InpRiskPct"),
@@ -496,12 +507,15 @@ def _live_read():
         spread = round(float(symbol_tick.ask) - float(symbol_tick.bid), 4)
 
     config = _read_config()
-    mql_log, term_log = _latest_logs()
+    mql_log, term_logs = _latest_logs()
     mql_lines = _tail(mql_log, 80)
-    term_lines = _tail(term_log, 800)
+    term_lines = []
+    for term_log in term_logs:
+        term_lines.extend(_tail(term_log, 800))
+    display_lines = _tail(term_logs[-1], 800) if term_logs else []
     relevant = [
         line
-        for line in term_lines
+        for line in display_lines
         if re.search(
             r"ORB|expert|automated trading|Market closed|order|deal|position|"
             r"failed|error|trade",
