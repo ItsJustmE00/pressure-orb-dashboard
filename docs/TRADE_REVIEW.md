@@ -177,3 +177,24 @@ Sorties : `out_orb_pressure_review/report.md`,
 
 Le trade 3 sera mis à jour à sa clôture de 22:55 NY avec le P/L final, le R et,
 si disponible, le MAE/MFE.
+
+## 9. Notification Telegram automatique
+
+Chaque nouvelle entrée du bot est notifiée sur Telegram par
+`tools/telegram_trade_notifier.py`, un processus en lecture seule :
+
+- il interroge `http://127.0.0.1:8050/api/live` toutes les 5 s (cache 2 s) ;
+- il reconstruit pression, spread, risque et signaux refusés depuis le log MQL5 ;
+- il n'ouvre jamais MT5 et ne touche ni à l'EA ni aux positions ;
+- l'état est conservé dans `logs/telegram_notifier_state.json` (id de position),
+  ce qui évite les doublons ;
+- les identifiants sont lus dans `tools/telegram.env` (ignoré par Git).
+
+Tâche planifiée `ORB Telegram Notifier` : déclenchement au logon, redémarrage
+automatique toutes les minutes en cas d'échec, instance unique.
+
+Test manuel :
+
+```powershell
+C:\Python314\python.exe tools\telegram_trade_notifier.py --once --dry-run --send-existing
+```
