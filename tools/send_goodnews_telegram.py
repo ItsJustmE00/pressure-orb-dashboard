@@ -1,9 +1,27 @@
 import os
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
-token = "8771213601:AAHLSo8DrRSbc_yIljSGS0UgVbmAlKPzxNE"
-chat_id = "6920893630"
+ROOT = Path(__file__).resolve().parents[1]
+ENV = ROOT / "tools" / "telegram.env"
+
+
+def load_credentials():
+    values = {}
+    for line in ENV.read_text(encoding="utf-8").splitlines():
+        if "=" not in line or line.strip().startswith("#"):
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip()
+    token = values.get("TELEGRAM_BOT_TOKEN")
+    chat_id = values.get("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        raise SystemExit(f"Identifiants Telegram manquants dans {ENV}")
+    return token, chat_id
+
+
+token, chat_id = load_credentials()
 
 msg = """📊 ORB — bonnes nouvelles du jour
 
