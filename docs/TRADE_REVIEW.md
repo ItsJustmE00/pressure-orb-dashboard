@@ -144,6 +144,9 @@ filtrer par sens**.
    conforme n'est pas une faute ; une entrée hors règle ou un défaut de taille
    en est une.
 
+> **Statut au 24/11** : le coupe-circuit 15:00 NY n'a pas été appliqué, faute
+> d'accord. L'EA et le preset restent inchangés.
+
 ## 6. Ce que « sans faute » signifie
 
 - Zéro faute d'exécution est un objectif atteignable et vérifiable : prix,
@@ -173,10 +176,12 @@ Sorties : `out_orb_pressure_review/report.md`,
 |------|-------|--------|------------|
 | 17/11 | SELL 0,82 | clôturé −19,77 $ | conforme, entrée tardive après rechargement |
 | 18/11 | BUY 0,30 | clôturé +21,11 $ | conforme, entrée tardive après rechargement |
-| 19/11 | SELL 0,25 | ouvert, +25,47 $ à 11:18 | conforme, entrée tardive à 1,42× le range |
+| 19/11 | SELL 0,25 | clôturé +243,49 $ (TP 2R) | conforme, entrée tardive à 1,42× le range, TP atteint |
 
-Le trade 3 sera mis à jour à sa clôture de 22:55 NY avec le P/L final, le R et,
-si disponible, le MAE/MFE.
+Le trade 3 a été clôturé au TP (2R). Le terminal était arrêté au moment de la
+clôture ; le P/L est reconstruit depuis le solde : 24 599,05 $ avant l'entrée,
+24 842,54 $ au redémarrage du 24/11, soit **+243,49 $** pour un risque de
+121,81 $ (**R ≈ +2,00**). Aucun autre trade n'a été pris entre-temps.
 
 ## 9. Notification Telegram automatique
 
