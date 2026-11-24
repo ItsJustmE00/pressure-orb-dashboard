@@ -63,7 +63,10 @@ def parse_args():
 
 def log(message):
     line = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {message}"
-    print(line)
+    try:
+        print(line)
+    except (AttributeError, OSError, ValueError):
+        pass
     try:
         if LOG.exists() and LOG.stat().st_size > 2_000_000:
             LOG.replace(LOG.with_suffix(".log.1"))

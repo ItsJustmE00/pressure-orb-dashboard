@@ -203,3 +203,7 @@ Test manuel :
 ```powershell
 C:\Python314\python.exe tools\telegram_trade_notifier.py --once --dry-run --send-existing
 ```
+
+Les tâches `ORB Watchdog` et `ORB Tunnel Keeper` passent par
+`tools/watchdog_hidden.vbs` et `tools/tunnel_hidden.vbs` : PowerShell est lancé
+avec une fenêtre cachée. Le notifier tourne sous `pythonw.exe`, sans console.
